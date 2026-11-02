@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+music_root=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$music_root/build/music.app/Contents/MacOS/music" ]; then
+    exec "$music_root/build/music.app/Contents/MacOS/music" "$@"
+fi
+if [ -x "$music_root/build/music" ]; then
+    exec "$music_root/build/music" "$@"
+fi
+echo 'Build the native app once with ./build.sh; see README.md for dependencies.' >&2
+exit 2
