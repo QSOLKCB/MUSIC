@@ -54,7 +54,7 @@ The GTK source and audio adapter are intended for Windows too. A supported Windo
 
 The core uses only the C standard library. The desktop adds system GTK 4.10+ and [miniaudio 0.11.26](https://github.com/mackron/miniaudio/tree/877ea4a7c2601c7b0f2a44e83dfac42e6470fea6) for local audio devices. The GUI build downloads that one pinned header and checks its SHA-256. It can instead be placed at `build/dependencies/miniaudio.h` before configuring for an offline build. Runtime needs no download, account, cloud inference, HTTP server, Node, or Docker.
 
-The app does not install system packages or drivers. Linux and macOS desktop builds and Linux native UI tests are configured in [CI](.github/workflows/checks.yml); the portable core is tested on all three operating systems. See [validation status](docs/VALIDATION.md) for executed results and limits.
+The app does not install system packages or drivers. Linux and macOS desktop builds, Linux native UI tests, and portable core tests on all three operating systems have passed in [CI](.github/workflows/checks.yml). See [validation status](docs/VALIDATION.md) for executed results and limits.
 
 ## Preview scope
 

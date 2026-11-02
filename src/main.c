@@ -33,6 +33,10 @@ static void properties(App *a);
 static void choose_file(App *a,int operation);
 static void ask_discard(App *a,int action);
 static void stop_audio(App *a);
+static void close_window(App *a) {
+    if(a->timer) { g_source_remove(a->timer); a->timer=0; }
+    gtk_window_destroy(GTK_WINDOW(a->window));
+}
 static void status(App *a,const char *text) { gtk_label_set_text(GTK_LABEL(a->status),text); }
 static GtkWidget *label(const char *text) { GtkWidget *w=gtk_label_new(text); gtk_label_set_xalign(GTK_LABEL(w),0); return w; }
 static GtkWidget *button(const char *text,GCallback callback,App *a) {
@@ -291,7 +295,7 @@ static void file_finished(GObject *object,GAsyncResult *result,gpointer data) {
     else if(ok) status(a,"Stereo WAV exported.");
     else status(a,j->error?j->error->message:j->message?j->message:"File operation failed; the previous destination was kept.");
     rebuild_peaks(a); rebuild_tracks(a);
-    if(a->closing_after_save) { a->closing_after_save=0; if(ok && j->operation==OP_SAVE) gtk_window_destroy(GTK_WINDOW(a->window)); }
+    if(a->closing_after_save) { a->closing_after_save=0; if(ok && j->operation==OP_SAVE) close_window(a); }
 }
 static void start_file(App *a,GFile *file,int operation) {
     FileJob *job; GTask *task; char *path=g_file_get_path(file);
@@ -329,7 +333,7 @@ static void choose_file(App *a,int operation) {
 }
 static void perform_action(App *a,int action) {
     char error[256];
-    if(action==CONFIRM_CLOSE) { gtk_window_destroy(GTK_WINDOW(a->window)); return; }
+    if(action==CONFIRM_CLOSE) { close_window(a); return; }
     if(action==CONFIRM_OPEN) { choose_file(a,OP_OPEN); return; }
     if(action==CONFIRM_DEMO) { if(!music_demo(&a->project,error)) {status(a,error);return;} a->dirty=1; }
     else { music_free(&a->project); a->dirty=0; }
@@ -389,7 +393,7 @@ static gboolean tick(gpointer data) {
         ++a->smoke_ticks;
         if(a->smoke_ticks==10) {
             char error[256]; if(!music_demo(&a->project,error))a->smoke_failed=1; rebuild_peaks(a);rebuild_tracks(a);
-            gtk_editable_set_text(GTK_EDITABLE(a->name),"Bass sketch — MIDI comes later");
+            gtk_editable_set_text(GTK_EDITABLE(a->name),"Evening session — warm bass sketch");
             gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->offset),.5);gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->trim_in),.25);
             gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->trim_out),7.5);gtk_range_set_value(GTK_RANGE(a->gain),.25);
             play_clicked(NULL,a);if(!audio_active(a->audio))a->smoke_failed=1;
@@ -406,7 +410,7 @@ static gboolean tick(gpointer data) {
             char *path=g_build_filename(a->smoke_dir,"Mix.wav",NULL),*bytes=NULL;gsize size=0;MusicProject mix;char error[256];music_init(&mix);
             if(a->project.count!=4 || a->dirty || !g_file_get_contents(path,&bytes,&size,NULL) || !music_import_wav(&mix,"export",(unsigned char*)bytes,size,error) || music_duration(&mix)!=music_duration(&a->project))a->smoke_failed=1;
             if(a->project.tracks[0].offset!=24000 || a->project.tracks[0].trim_in!=12000 || a->project.tracks[0].trim_out!=360000 ||
-               a->project.tracks[0].gain!=MUSIC_UNITY/4 || strcmp(a->project.tracks[0].name,"Bass sketch — MIDI comes later"))a->smoke_failed=1;
+               a->project.tracks[0].gain!=MUSIC_UNITY/4 || strcmp(a->project.tracks[0].name,"Evening session — warm bass sketch"))a->smoke_failed=1;
             music_free(&mix);g_free(bytes);g_free(path);a->smoke_stage=5;
         }
         if(a->smoke_ticks>=750) {a->smoke_failed=1;if(a->cancel_io)g_cancellable_cancel(a->cancel_io);}

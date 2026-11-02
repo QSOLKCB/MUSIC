@@ -9,9 +9,18 @@ This is a source preview. Executed checks and unverified areas are kept separate
 - Deterministic demo WAV SHA-256: `79e190e03151525c844b882cc2c3174fe6be7651d9fe29d7dc2584b7b72c301a`.
 - Pinned miniaudio adapter compiled as C99 against version 0.11.26, commit `877ea4a7c2601c7b0f2a44e83dfac42e6470fea6`.
 
-## CI checks
+## Executed in CI
 
-The workflow runs core tests on Windows, Linux and macOS, compares their rendered WAV digests, builds the GTK desktop on Linux and macOS, and exercises actual GTK widgets plus the null audio device on Linux. The GUI check covers playback, capture, project save/reopen, and WAV export. These CI results are pending until the first run completes.
+All five jobs passed in [run 41547037825](https://github.com/QSOLKCB/MUSIC/actions/runs/41547037825) at commit `846578ef83afdd96629722ae4f61f32bffe34137` on 2 November 2026 UTC:
+
+| Platform | Executed result |
+| --- | --- |
+| Ubuntu 24.04 | Core tests with address/undefined-behaviour sanitizers, including normal leak detection; matching demo WAV digest |
+| Windows | Core tests and matching demo WAV digest |
+| macOS | Core tests and matching demo WAV digest; GTK desktop and `.app` bundle compiled successfully |
+| Linux GTK desktop | Built successfully; native widget edits, playback, null-device capture, project save/reopen, and WAV export passed under Xvfb |
+
+The GUI test verifies that a Unicode track name, clip placement, trims and gain survive saving and reopening. It decodes the exported WAV and checks its arrangement duration. CI retains a native window screenshot and smoke log as `gtk-evidence` artifacts for 14 days. The [PR checks](https://github.com/QSOLKCB/MUSIC/pull/1/checks) track subsequent commits.
 
 ## Not yet verified
 
