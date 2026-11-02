@@ -52,7 +52,7 @@ static void rebuild_peaks(App *a) {
     for(i=0;i<MUSIC_TRACKS;++i) {
         free(a->peaks[i]); a->peaks[i]=NULL; a->peak_count[i]=0;
         if(i<a->project.count) {
-            MusicTrack *t=&a->project.tracks[i]; uint32_t f,bins=(t->frames+255)/256;
+            MusicTrackData *t=&a->project.tracks[i]; uint32_t f,bins=(t->frames+255)/256;
             a->peaks[i]=(uint16_t*)calloc(bins,sizeof(uint16_t));
             if(!a->peaks[i]) continue;
             a->peak_count[i]=bins;
@@ -97,7 +97,7 @@ static void draw(GtkDrawingArea *area,cairo_t *cr,int width,int height,gpointer 
       }
     }
     for(i=0;i<a->project.count;++i) {
-        MusicTrack *t=&a->project.tracks[i]; double x=(double)t->offset/MUSIC_RATE*scale;
+        MusicTrackData *t=&a->project.tracks[i]; double x=(double)t->offset/MUSIC_RATE*scale;
         double w=(double)(t->trim_out-t->trim_in)/MUSIC_RATE*scale,y=40+i*80.0;
         int from=(int)fmax(0,x),to=(int)fmin(width,ceil(x+w)),pixel;
         cairo_set_source_rgb(cr,.19,.22,.26); cairo_move_to(cr,0,y+79); cairo_line_to(cr,width,y+79); cairo_stroke(cr);
@@ -144,12 +144,12 @@ static void refresh(App *a) {
         snprintf(text,sizeof(text),"%02u  %s%s%s",i+1,valid,a->project.tracks[i].mute?"  [M]":"",a->project.tracks[i].solo?"  [S]":"");
         gtk_label_set_text(GTK_LABEL(a->row_labels[i]),text); g_free(valid);
     }
-    { char *name=a->file?g_file_get_basename(a->file):g_strdup("Untitled");
-      char *title=g_strdup_printf("%s%s — MUSIC",a->dirty?"• ":"",name); gtk_window_set_title(GTK_WINDOW(a->window),title); g_free(title); g_free(name); }
+    { char *name=a->file?g_file_get_basename(a->file):g_strdup("Untitled"),*valid=g_utf8_make_valid(name,-1);
+      char *title=g_strdup_printf("%s%s — MUSIC",a->dirty?"• ":"",valid); gtk_window_set_title(GTK_WINDOW(a->window),title); g_free(title); g_free(valid); g_free(name); }
     gtk_widget_queue_draw(a->canvas);
 }
 static void properties(App *a) {
-    MusicTrack *t; a->updating=1; gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->bpm),a->project.bpm);
+    MusicTrackData *t; a->updating=1; gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->bpm),a->project.bpm);
     if(!a->project.count) { a->updating=0; return; } t=&a->project.tracks[a->selected];
     char *valid=g_utf8_make_valid(t->name,-1); gtk_editable_set_text(GTK_EDITABLE(a->name),valid); g_free(valid);
     gtk_spin_button_set_range(GTK_SPIN_BUTTON(a->offset),0,(double)(MUSIC_TIMELINE_FRAMES-(t->trim_out-t->trim_in))/MUSIC_RATE);
@@ -163,10 +163,13 @@ static void properties(App *a) {
     gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->bpm),a->project.bpm); a->updating=0;
 }
 static void changed(GtkWidget *widget,gpointer data) {
-    App *a=data; MusicTrack *t; (void)widget;
+    App *a=data; MusicTrackData *t; (void)widget;
     if(a->updating || a->busy || audio_active(a->audio) || !a->project.count) return;
     t=&a->project.tracks[a->selected];
-    { const char *text=gtk_editable_get_text(GTK_EDITABLE(a->name)); char *name=g_utf8_substring(text,0,MIN(31,g_utf8_strlen(text,-1))); snprintf(t->name,sizeof(t->name),"%s",name); g_free(name); }
+    { const char *text=gtk_editable_get_text(GTK_EDITABLE(a->name)); size_t original=strlen(text),length=MIN(original,sizeof(t->name)-1);
+      while(length && ((unsigned char)text[length]&0xc0)==0x80)--length;
+      memcpy(t->name,text,length);t->name[length]=0;
+      if(length<original){a->updating=1;gtk_editable_set_text(GTK_EDITABLE(a->name),t->name);a->updating=0;} }
     t->trim_in=(uint32_t)llround(gtk_spin_button_get_value(GTK_SPIN_BUTTON(a->trim_in))*MUSIC_RATE);
     t->trim_out=(uint32_t)llround(gtk_spin_button_get_value(GTK_SPIN_BUTTON(a->trim_out))*MUSIC_RATE);
     if(t->trim_out>t->frames) t->trim_out=t->frames;
@@ -193,7 +196,7 @@ static void drag_begin(GtkGestureDrag *gesture,double x,double y,gpointer data) 
     }
 }
 static void drag_update(GtkGestureDrag *gesture,double dx,double dy,gpointer data) {
-    App *a=data; MusicTrack *t; double frame; (void)gesture; (void)dy;
+    App *a=data; MusicTrackData *t; double frame; (void)gesture; (void)dy;
     if(a->drag_track<0 || a->busy || audio_active(a->audio)) return;
     t=&a->project.tracks[a->drag_track]; frame=a->drag_start+dx*a->drag_seconds*MUSIC_RATE;
     if(gtk_check_button_get_active(GTK_CHECK_BUTTON(a->snap))) { double beat=60.0*MUSIC_RATE/a->project.bpm; frame=round(frame/beat)*beat; }
@@ -213,12 +216,14 @@ static void stop_audio(App *a) {
 }
 static void play_clicked(GtkButton *b,gpointer data) {
     App *a=data; char error[256]; (void)b;
+    if(a->busy || a->dialog_open)return;
     if(audio_active(a->audio)) { stop_audio(a); return; }
     if(a->position>=music_duration(&a->project)) a->position=0;
     if(!audio_start(a->audio,&a->project,a->position,0,error)) status(a,error); else status(a,"Playing locally."); refresh(a);
 }
 static void record_clicked(GtkButton *b,gpointer data) {
     App *a=data; char error[256]; (void)b;
+    if(a->busy || a->dialog_open)return;
     if(audio_recording(a->audio)) { stop_audio(a); return; }
     stop_audio(a);
     if(!audio_start(a->audio,&a->project,a->position,1,error)) status(a,error);
@@ -276,7 +281,7 @@ static void file_finished(GObject *object,GAsyncResult *result,gpointer data) {
     App *a=data; GTask *task=G_TASK(result); FileJob *j=g_task_get_task_data(task); int ok=g_task_propagate_boolean(task,NULL); char error[256]; (void)object;
     a->busy=0; g_clear_object(&a->cancel_io);
     if(ok && j->operation==OP_IMPORT) {
-        MusicTrack *t=&j->loaded.tracks[0];
+        MusicTrackData *t=&j->loaded.tracks[0];
         if(music_add_pcm(&a->project,t->name,t->samples,t->frames,0,error)) { t->samples=NULL; a->selected=a->project.count-1; a->dirty=1; status(a,"WAV added. Drag the clip or adjust its start and trim below."); }
         else { ok=0; status(a,error); }
     } else if(ok && j->operation==OP_OPEN) {
@@ -362,7 +367,7 @@ static gboolean close_requested(GtkWindow *window,gpointer data) {
 }
 static gboolean drop(GtkDropTarget *target,const GValue *value,double x,double y,gpointer data) {
     App *a=data; GSList *files; (void)target;(void)x;(void)y;
-    if(a->busy || audio_active(a->audio))return FALSE;
+    if(a->busy || a->dialog_open || audio_active(a->audio))return FALSE;
     files=gdk_file_list_get_files(g_value_get_boxed(value));
     if(!files)return FALSE;
     if(files->next) {status(a,"Add one WAV at a time in this preview.");return FALSE;}
@@ -382,7 +387,13 @@ static gboolean tick(gpointer data) {
     }
     if(a->smoke) {
         ++a->smoke_ticks;
-        if(a->smoke_ticks==10) { char error[256]; if(!music_demo(&a->project,error))a->smoke_failed=1; rebuild_peaks(a);rebuild_tracks(a);play_clicked(NULL,a);if(!audio_active(a->audio))a->smoke_failed=1; }
+        if(a->smoke_ticks==10) {
+            char error[256]; if(!music_demo(&a->project,error))a->smoke_failed=1; rebuild_peaks(a);rebuild_tracks(a);
+            gtk_editable_set_text(GTK_EDITABLE(a->name),"Bass sketch — MIDI comes later");
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->offset),.5);gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->trim_in),.25);
+            gtk_spin_button_set_value(GTK_SPIN_BUTTON(a->trim_out),7.5);gtk_range_set_value(GTK_RANGE(a->gain),.25);
+            play_clicked(NULL,a);if(!audio_active(a->audio))a->smoke_failed=1;
+        }
         if(a->smoke_ticks==25) { if(!audio_position(a->audio))a->smoke_failed=1;stop_audio(a);record_clicked(NULL,a);if(!audio_recording(a->audio))a->smoke_failed=1; }
         if(a->smoke_ticks==40) {stop_audio(a);if(a->project.count!=4 || !music_valid(&a->project))a->smoke_failed=1;a->smoke_stage=1;a->smoke_dir=g_dir_make_tmp("music-smoke-XXXXXX",NULL);if(!a->smoke_dir)a->smoke_failed=1;}
         if(a->smoke_ticks>=45 && !a->busy && a->smoke_dir && a->smoke_stage>=1 && a->smoke_stage<=3) {
@@ -394,6 +405,8 @@ static gboolean tick(gpointer data) {
         if(a->smoke_stage==4 && !a->busy) {
             char *path=g_build_filename(a->smoke_dir,"Mix.wav",NULL),*bytes=NULL;gsize size=0;MusicProject mix;char error[256];music_init(&mix);
             if(a->project.count!=4 || a->dirty || !g_file_get_contents(path,&bytes,&size,NULL) || !music_import_wav(&mix,"export",(unsigned char*)bytes,size,error) || music_duration(&mix)!=music_duration(&a->project))a->smoke_failed=1;
+            if(a->project.tracks[0].offset!=24000 || a->project.tracks[0].trim_in!=12000 || a->project.tracks[0].trim_out!=360000 ||
+               a->project.tracks[0].gain!=MUSIC_UNITY/4 || strcmp(a->project.tracks[0].name,"Bass sketch — MIDI comes later"))a->smoke_failed=1;
             music_free(&mix);g_free(bytes);g_free(path);a->smoke_stage=5;
         }
         if(a->smoke_ticks>=750) {a->smoke_failed=1;if(a->cancel_io)g_cancellable_cancel(a->cancel_io);}

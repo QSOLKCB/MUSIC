@@ -24,8 +24,8 @@ void music_free(MusicProject *p) {
 void music_remove(MusicProject *p, unsigned i) {
     if (i>=p->count) return;
     free(p->tracks[i].samples);
-    memmove(&p->tracks[i], &p->tracks[i+1], (p->count-i-1)*sizeof(MusicTrack));
-    memset(&p->tracks[--p->count], 0, sizeof(MusicTrack));
+    memmove(&p->tracks[i], &p->tracks[i+1], (p->count-i-1)*sizeof(MusicTrackData));
+    memset(&p->tracks[--p->count], 0, sizeof(MusicTrackData));
 }
 size_t music_memory(const MusicProject *p) {
     size_t total=0; unsigned i;
@@ -36,7 +36,7 @@ int music_valid(const MusicProject *p) {
     unsigned i;
     if (p->count > MUSIC_TRACKS || p->bpm<40 || p->bpm>240) return 0;
     for (i=0;i<p->count;++i) {
-        const MusicTrack *t=&p->tracks[i];
+        const MusicTrackData *t=&p->tracks[i];
         if (!t->samples || !t->frames || t->frames>MUSIC_CLIP_FRAMES ||
             t->trim_in>=t->trim_out || t->trim_out>t->frames ||
             t->offset>MUSIC_TIMELINE_FRAMES-(t->trim_out-t->trim_in) ||
@@ -48,13 +48,13 @@ int music_valid(const MusicProject *p) {
 uint32_t music_duration(const MusicProject *p) {
     uint32_t end=0; unsigned i;
     for (i=0;i<p->count;++i) {
-        const MusicTrack *t=&p->tracks[i]; uint32_t n=t->offset+t->trim_out-t->trim_in;
+        const MusicTrackData *t=&p->tracks[i]; uint32_t n=t->offset+t->trim_out-t->trim_in;
         if (n>end) end=n;
     }
     return end;
 }
 int music_add_pcm(MusicProject *p,const char *name,int16_t *samples,uint32_t frames,uint32_t offset,char error[256]) {
-    MusicTrack *t;
+    MusicTrackData *t;
     if (!samples || !frames || frames>MUSIC_CLIP_FRAMES) return fail(error,"Clip must contain 1 frame to 10 minutes of audio.");
     if (p->count>=MUSIC_TRACKS) return fail(error,"This preview supports 16 tracks.");
     if (offset>MUSIC_TIMELINE_FRAMES-frames) return fail(error,"Arrangement exceeds the 30-minute preview limit.");
@@ -119,7 +119,7 @@ void music_render(const MusicProject *p,uint32_t start,uint32_t frames,int16_t *
     for(f=0;f<frames;++f) {
         int64_t left=0,right=0; uint64_t position=(uint64_t)start+f;
         for(i=0;i<p->count;++i) {
-            const MusicTrack *t=&p->tracks[i]; uint64_t index;
+            const MusicTrackData *t=&p->tracks[i]; uint64_t index;
             if(t->mute || (any_solo && !t->solo) || position<t->offset) continue;
             index=position-t->offset+t->trim_in;
             if(index>=t->trim_out) continue;
@@ -165,7 +165,7 @@ int music_save(const MusicProject *p,MusicWrite write,void *ctx,char error[256])
     memcpy(header,"MUSICP01",8); put32(header+8,MUSIC_RATE); put32(header+12,p->count); put32(header+16,p->bpm);
     if(!write(ctx,header,20)) return fail(error,"Could not write project header.");
     for(i=0;i<p->count;++i) {
-        const MusicTrack *t=&p->tracks[i]; unsigned char meta[28]; size_t name_len=strlen(t->name);
+        const MusicTrackData *t=&p->tracks[i]; unsigned char meta[28]; size_t name_len=strlen(t->name);
         put32(meta,(uint32_t)name_len); put32(meta+4,t->frames); put32(meta+8,t->offset);
         put32(meta+12,t->trim_in); put32(meta+16,t->trim_out); put32(meta+20,t->gain);
         put32(meta+24,t->mute|(t->solo<<1));

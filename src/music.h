@@ -16,8 +16,8 @@ typedef struct {
     int16_t *samples; /* Owned, interleaved stereo at 48 kHz. */
     uint32_t frames, offset, trim_in, trim_out, gain;
     unsigned mute, solo;
-} MusicTrack;
-typedef struct { MusicTrack tracks[MUSIC_TRACKS]; unsigned count, bpm; } MusicProject;
+} MusicTrackData;
+typedef struct { MusicTrackData tracks[MUSIC_TRACKS]; unsigned count, bpm; } MusicProject;
 typedef int (*MusicWrite)(void *context, const void *data, size_t size);
 
 void music_init(MusicProject *project);
