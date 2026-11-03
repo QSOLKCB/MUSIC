@@ -77,68 +77,97 @@ def windows_error(operation):
     return error
 
 
-def loaded_modules(pid, output):
-    """Capture names in one Toolhelp snapshot, not live per-module PSAPI reads."""
-    class ModuleEntry(ctypes.Structure):
-        _fields_ = [("dwSize", wintypes.DWORD), ("th32ModuleID", wintypes.DWORD),
-                    ("th32ProcessID", wintypes.DWORD), ("GlblcntUsage", wintypes.DWORD),
-                    ("ProccntUsage", wintypes.DWORD), ("modBaseAddr", ctypes.POINTER(ctypes.c_byte)),
-                    ("modBaseSize", wintypes.DWORD), ("hModule", wintypes.HMODULE),
-                    ("szModule", wintypes.WCHAR * 256), ("szExePath", wintypes.WCHAR * 260)]
+class ModuleListChanged(RuntimeError):
+    """A failed module query was confirmed absent in a fresh enumeration."""
 
-    output.append(f"Module snapshot ABI: size={ctypes.sizeof(ModuleEntry)}, "
-                  f"WCHAR={ctypes.sizeof(wintypes.WCHAR)}, "
-                  f"path_offset={ModuleEntry.szExePath.offset}; PID={pid}")
+
+def module_count(needed, item_size, capacity):
+    if not needed or needed % item_size or needed > capacity * item_size:
+        raise ValueError("Invalid or incomplete loaded-module count")
+    return needed // item_size
+
+
+def validated_module_handles(modules):
+    if not modules or any(not module for module in modules) or len(set(modules)) != len(modules):
+        raise ValueError("Empty, null or duplicate loaded-module handles")
+    return modules
+
+
+def module_names(modules, read_name, read_modules):
+    names = []
+    for module in validated_module_handles(modules):
+        try:
+            names.append(read_name(module))
+        except OSError as error:
+            if (getattr(error, "winerror", None) == 6 and
+                    getattr(error, "operation", None) == "GetModuleFileNameExW" and
+                    module not in validated_module_handles(read_modules())):
+                raise ModuleListChanged(f"Module {module:#x} unloaded during Unicode path query") from error
+            raise
+    return names
+
+
+def loaded_modules(pid, output):
+    """Read Unicode paths; Toolhelp names can transliterate non-ANSI characters."""
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
-    kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
-    kernel.Module32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ModuleEntry)]
-    kernel.Module32FirstW.restype = wintypes.BOOL
-    kernel.Module32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ModuleEntry)]
-    kernel.Module32NextW.restype = wintypes.BOOL
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
     kernel.CloseHandle.restype = wintypes.BOOL
-    handle = kernel.CreateToolhelp32Snapshot(0x00000008 | 0x00000010, pid)
-    if handle == ctypes.c_void_p(-1).value:
-        raise windows_error("CreateToolhelp32Snapshot")
+    psapi.EnumProcessModulesEx.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.HMODULE),
+                                        wintypes.DWORD, ctypes.POINTER(wintypes.DWORD), wintypes.DWORD]
+    psapi.EnumProcessModulesEx.restype = wintypes.BOOL
+    psapi.GetModuleFileNameExW.argtypes = [wintypes.HANDLE, wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
+    psapi.GetModuleFileNameExW.restype = wintypes.DWORD
+    handle = kernel.OpenProcess(0x0400 | 0x0010, False, pid)
+    if not handle:
+        raise windows_error("OpenProcess")
     try:
-        entry = ModuleEntry()
-        entry.dwSize = ctypes.sizeof(entry)
-        if not kernel.Module32FirstW(handle, ctypes.byref(entry)):
-            raise windows_error("Module32FirstW")
+        def read_modules():
+            modules = (wintypes.HMODULE * 2048)()
+            needed = wintypes.DWORD()
+            if not psapi.EnumProcessModulesEx(handle, modules, ctypes.sizeof(modules), ctypes.byref(needed), 3):
+                raise windows_error("EnumProcessModulesEx")
+            count = module_count(needed.value, ctypes.sizeof(wintypes.HMODULE), len(modules))
+            return list(modules[:count])
+
+        def read_name(module):
+            path = ctypes.create_unicode_buffer(32768)
+            length = psapi.GetModuleFileNameExW(handle, module, path, len(path))
+            if not length:
+                error = windows_error("GetModuleFileNameExW")
+                output.append(f"Unicode module path query failed: PID={pid}, module={module:#x}, {error}")
+                raise error
+            if not path.value or length >= len(path) - 1:
+                raise ValueError("Empty or potentially truncated Unicode module path")
+            output.append(f"Snapshot raw Unicode path: {path.value!r}")
+            return path.value
+
+        names = module_names(read_modules(), read_name, read_modules)
         paths = []
-        while True:
-            name = entry.szExePath
-            if not name or len(name) >= 259:
-                raise ValueError("Empty or potentially truncated module snapshot path")
-            output.append(f"Snapshot raw path: {name!r}")
-            resolved = Path(name).resolve()
+        for name in names:
+            resolved = Path(name).resolve(strict=True)
             output.append(f"Snapshot resolved path: {resolved!r}")
             paths.append(resolved)
-            if not kernel.Module32NextW(handle, ctypes.byref(entry)):
-                if ctypes.get_last_error() != 18:  # ERROR_NO_MORE_FILES
-                    raise windows_error("Module32NextW")
-                return paths
+        return paths
     finally:
         kernel.CloseHandle(handle)
 
 
 def snapshot_modules(process, output):
-    # Microsoft documents ERROR_BAD_LENGTH for a module list changing during
-    # snapshot creation. Retry the whole snapshot for at most one second while
-    # the child is alive; never omit modules or accept an incomplete observation.
+    # Retry a whole capture only when the failed module was demonstrably removed
+    # from a fresh, validated enumeration. Never keep a partial earlier list.
     deadline = time.monotonic() + 1.0
     while True:
         if process.poll() is not None:
             raise ValueError("GUI exited before its module snapshot")
         try:
             return loaded_modules(process.pid, output)
-        except OSError as error:
-            retryable = (getattr(error, "winerror", None) == 24 and
-                         getattr(error, "operation", None) == "CreateToolhelp32Snapshot")
-            if not retryable or process.poll() is not None or time.monotonic() >= deadline:
+        except ModuleListChanged as error:
+            if process.poll() is not None or time.monotonic() >= deadline:
                 raise
-            output.append("Module snapshot changed during capture (ERROR_BAD_LENGTH); retrying complete snapshot")
+            output.append(f"{error}; retrying complete snapshot")
             time.sleep(0.05)
 
 

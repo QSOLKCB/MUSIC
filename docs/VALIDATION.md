@@ -46,7 +46,7 @@ ZIP from a Unicode/space path with no development PATH and checks loaded DLLs.
 The separate runtime diagnostic exercises schemas, symbolic icons and SVGs;
 the existing GUI smoke exercises null-device audio and project persistence.
 
-Locally, all four Release CTest targets pass, including 26 portable packaging
+Locally, all four Release CTest targets pass, including 30 portable packaging
 helper tests; the deterministic demo WAV digest remains unchanged. Native
 Windows build/package/smoke results must be read at the exact PR head. They have
 not been executed on this Linux workspace, which has no Windows desktop or GTK.
@@ -73,8 +73,17 @@ including the extracted runtime and GUI smoke. The corresponding
 after schema/icon/SVG validation, during live module inspection with WinError 6.
 The old diagnostic did not identify the failing operation, so the exact cause
 is not established. Dependency package versions and bundled dependencies
-matched between those runs. The verifier now captures module names using a
-Toolhelp snapshot instead of querying each module's live handle, with bounded
-retry only for the documented snapshot-changing error and explicit API names on
-failures. Invalid-handle errors still fail; no module is skipped. These historical
-results do not substitute for green checks on the corrected head.
+matched between those runs. A subsequent correction captured module names using
+a Toolhelp snapshot, with bounded retry for its documented changing-list error
+and explicit API names on failures. That approach failed the Unicode path test
+as described below. These historical results do not substitute for green checks
+on the corrected head.
+
+The subsequent [diagnostic run](https://github.com/QSOLKCB/MUSIC/actions/runs/41565245620)
+established that Toolhelp's wide-character snapshot names replaced the directory's
+Greek Ω with Latin O before path resolution; its structure layout was correct.
+The Unicode relocation test remains unchanged. The verifier now queries Unicode
+names with PSAPI, and retries an invalid module-handle query only if that module
+is demonstrably absent in a fresh validated enumeration. A retry discards the
+whole previous capture, is time-bounded, and requires the child to remain alive.
+Persistent errors, incomplete enumerations and containment failures still fail.

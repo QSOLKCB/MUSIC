@@ -81,9 +81,9 @@ and SVG loading with `music-runtime-check.exe`.
 
 It then runs the packaged `music.exe --smoke`: native widget edits, playback,
 null-device recording, save, export and reopen. While it runs, the verifier checks
-the child's loaded module paths with a Windows Toolhelp snapshot (retrying only
-the documented changing-list error for at most one second while the child is
-alive), requires the packaged application/GTK DLL in
+the child's Unicode loaded-module paths (retrying the whole capture for at most
+one second only when a failed module is absent from a fresh validated enumeration
+and the child is alive), requires the packaged application/GTK DLL in
 the snapshot, and rejects DLLs outside the extracted package or Windows directory.
 The smoke log, manifests, package inventories and ZIP hash (not the ZIP) are
 retained by the Windows desktop CI job for 14 days. A green job is not a physical audio, latency, Windows file

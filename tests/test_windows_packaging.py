@@ -216,17 +216,17 @@ class PackagingTests(unittest.TestCase):
                     package.relative_loader_cache(f'"{path}"\n', prefix, modules)
 
     @staticmethod
-    def snapshot_error(code, operation="CreateToolhelp32Snapshot"):
+    def snapshot_error(code, operation="GetModuleFileNameExW"):
         error = OSError("snapshot test error")
         error.winerror, error.operation = code, operation
         return error
 
-    def test_snapshot_retries_only_documented_capture_race(self):
+    def test_snapshot_retries_only_confirmed_unload(self):
         process = MagicMock()
         process.poll.return_value = None
         output = []
         paths = [Path("/package/bin/music.exe"), Path("/package/bin/libgtk-4-1.dll")]
-        with patch.object(check, "loaded_modules", side_effect=[self.snapshot_error(24), paths]) as read, \
+        with patch.object(check, "loaded_modules", side_effect=[check.ModuleListChanged("confirmed unload"), paths]) as read, \
              patch.object(check.time, "sleep"), patch.object(check.time, "monotonic", return_value=0):
             self.assertEqual(check.snapshot_modules(process, output), paths)
             self.assertEqual(read.call_count, 2)
@@ -235,14 +235,51 @@ class PackagingTests(unittest.TestCase):
     def test_snapshot_other_errors_and_exhausted_window_fail(self):
         process = MagicMock()
         process.poll.return_value = None
-        for code, operation in ((6, "CreateToolhelp32Snapshot"), (5, "CreateToolhelp32Snapshot"), (24, "Module32NextW")):
+        for code, operation in ((6, "GetModuleFileNameExW"), (5, "GetModuleFileNameExW"), (6, "EnumProcessModulesEx")):
             with self.subTest(code=code, operation=operation), \
                  patch.object(check, "loaded_modules", side_effect=self.snapshot_error(code, operation)) as read, \
                  self.assertRaises(OSError):
                 check.snapshot_modules(process, [])
             self.assertEqual(read.call_count, 1)
-        with patch.object(check, "loaded_modules", side_effect=self.snapshot_error(24)) as read, \
-             patch.object(check.time, "monotonic", side_effect=[0, 2]), self.assertRaises(OSError):
+        with patch.object(check, "loaded_modules", side_effect=check.ModuleListChanged("confirmed unload")) as read, \
+             patch.object(check.time, "monotonic", side_effect=[0, 2]), self.assertRaises(check.ModuleListChanged):
+            check.snapshot_modules(process, [])
+        self.assertEqual(read.call_count, 1)
+
+    def test_unicode_names_and_confirmed_unload_discard_partial_list(self):
+        self.assertEqual(check.module_names([1], lambda _: "C:/Ω/music.exe", lambda: [1]), ["C:/Ω/music.exe"])
+        with self.assertRaises(check.ModuleListChanged):
+            check.module_names([1, 2], MagicMock(side_effect=["partial", self.snapshot_error(6)]), lambda: [1])
+        # The next complete capture returns only its own results, never "partial".
+        self.assertEqual(check.module_names([3], lambda _: "replacement", lambda: [3]), ["replacement"])
+
+    def test_persistent_invalid_handle_and_access_errors_do_not_retry(self):
+        for code, operation, fresh in ((6, "GetModuleFileNameExW", [1]),
+                                       (5, "GetModuleFileNameExW", []),
+                                       (6, "OpenProcess", [])):
+            error = self.snapshot_error(code, operation)
+            with self.subTest(code=code, operation=operation), self.assertRaises(OSError) as caught:
+                check.module_names([1], MagicMock(side_effect=error), lambda: fresh)
+            self.assertIs(caught.exception, error)
+
+    def test_invalid_fresh_enumeration_cannot_license_retry(self):
+        for needed in (0, 1, 17, 24):
+            with self.subTest(needed=needed), self.assertRaises(ValueError):
+                check.module_names([1], MagicMock(side_effect=self.snapshot_error(6)),
+                                   lambda: check.module_count(needed, 8, 2))
+        self.assertEqual(check.module_count(16, 8, 2), 2)
+        for handles in ([], [None], [0], [1, 1]):
+            with self.subTest(handles=handles), self.assertRaises(ValueError):
+                check.module_names([1], MagicMock(side_effect=self.snapshot_error(6)), lambda: handles)
+        with self.assertRaisesRegex(OSError, "enumeration denied"):
+            check.module_names([1], MagicMock(side_effect=self.snapshot_error(6)),
+                               MagicMock(side_effect=OSError("enumeration denied")))
+
+    def test_snapshot_cannot_retry_if_child_exits_during_capture(self):
+        process = MagicMock()
+        process.poll.side_effect = [None, 0]
+        with patch.object(check, "loaded_modules", side_effect=check.ModuleListChanged("unloaded")) as read, \
+             self.assertRaises(check.ModuleListChanged):
             check.snapshot_modules(process, [])
         self.assertEqual(read.call_count, 1)
 
