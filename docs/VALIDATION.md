@@ -46,10 +46,22 @@ ZIP from a Unicode/space path with no development PATH and checks loaded DLLs.
 The separate runtime diagnostic exercises schemas, symbolic icons and SVGs;
 the existing GUI smoke exercises null-device audio and project persistence.
 
-Locally, all four Release CTest targets pass, including 12 portable packaging
+Locally, all four Release CTest targets pass, including 18 portable packaging
 negative tests; the deterministic demo WAV digest remains unchanged. Native
 Windows build/package/smoke results must be read at the exact PR head. They have
 not been executed on this Linux workspace, which has no Windows desktop or GTK.
 No physical device, permission prompt, latency or dropout result is claimed.
 The [physical-device checklist](DEVICE-ACCEPTANCE.md) remains explicitly unexecuted.
 Historical validation and exact-span mixer evidence are preserved unchanged.
+
+The initial Windows workflow could not start because the repository permits only
+GitHub-owned or enterprise-owned Actions (runs `41558625804` and `41558635807`).
+The workflow now uses the Windows runner's preinstalled MSYS2 and normal package
+manager commands. The repository restriction is unchanged; the disallowed action
+is neither vendored nor executed indirectly. Those startup failures remain part
+of the validation history.
+
+The Windows job uploads only logs, source/file manifests, package inventories and
+archive hashes. Dependency-bearing ZIP/DLL upload is gated off until matching
+corresponding sources and redistribution review are complete. The locally built
+ZIP is still extracted and tested inside CI; no binary release is implied.

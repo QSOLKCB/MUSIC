@@ -103,6 +103,10 @@ def build_package(build, prefix, destination, source):
         raise ValueError("Run with the native MSYS2 UCRT64 Python on Windows")
     if destination.exists():
         raise ValueError(f"Refusing to overwrite package output: {destination}")
+    if run("git", "-C", source, "status", "--porcelain").strip():
+        raise ValueError("Package only a clean checkout so HEAD identifies the actual source")
+    source_commit = run("git", "-C", source, "rev-parse", "HEAD").strip()
+    source_tree = run("git", "-C", source, "rev-parse", "HEAD^{tree}").strip()
     objdump = prefix / "bin/objdump.exe"
     system = dll_index(Path(os.environ["SystemRoot"]) / "System32")
     bin_dir = destination / "bin"
@@ -159,9 +163,8 @@ def build_package(build, prefix, destination, source):
         owners[relative] = ownership[relative.lower()]
     (destination / "runtime-packages.txt").write_text(run(pacman, "-Qi", *sorted(set(owners.values()))), encoding="utf-8")
     manifest = {
-        "format": 1, "source_commit": run("git", "-C", source, "rev-parse", "HEAD").strip(),
-        "source_tree": run("git", "-C", source, "rev-parse", "HEAD^{tree}").strip(),
-        "source_dirty": bool(run("git", "-C", source, "status", "--porcelain").strip()),
+        "format": 1, "source_commit": source_commit, "source_tree": source_tree,
+        "source_dirty": False,
         "architecture": "Windows x64 / MSYS2 UCRT64", "runtime_owners": owners,
         "windows_system_imports": system_imports,
         "files": {path.relative_to(destination).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()

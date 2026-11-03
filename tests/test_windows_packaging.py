@@ -3,8 +3,9 @@ import importlib.util
 import json
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -95,6 +96,66 @@ class PackagingTests(unittest.TestCase):
             self.assertNotIn("GDK_PIXBUF_MODULE_FILE", env)
             self.assertNotIn("XDG_DATA_DIRS", env)
             self.assertEqual(env["GSK_RENDERER"], "cairo")
+
+    def test_failed_runtime_command_retains_diagnostics(self):
+        result = subprocess.CompletedProcess(["diagnostic"], 1, "Missing schema detail")
+        with tempfile.TemporaryDirectory() as temp:
+            log = Path(temp) / "failure.log"
+            with patch.object(check.subprocess, "run", return_value=result), self.assertRaises(subprocess.CalledProcessError):
+                with check.validation_log(log) as output:
+                    check.run_logged(["diagnostic"], Path(temp), {}, output)
+            self.assertIn("Missing schema detail", log.read_text())
+            self.assertIn("FAILED", log.read_text())
+
+    def test_timeout_retains_partial_output(self):
+        error = subprocess.TimeoutExpired(["diagnostic"], 30, output=b"partial diagnostic")
+        with tempfile.TemporaryDirectory() as temp:
+            log = Path(temp) / "timeout.log"
+            with patch.object(check.subprocess, "run", side_effect=error), self.assertRaises(subprocess.TimeoutExpired):
+                with check.validation_log(log) as output:
+                    check.run_logged(["diagnostic"], Path(temp), {}, output)
+            self.assertIn("partial diagnostic", log.read_text())
+
+    def test_module_audit_failure_drains_gui_output(self):
+        process = MagicMock()
+        process.__enter__.return_value = process
+        process.poll.return_value = None
+        process.communicate.return_value = ("GUI startup diagnostics", None)
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            log = root / "modules.log"
+            with patch.object(check.subprocess, "Popen", return_value=process), \
+                 patch.object(check.time, "sleep"), \
+                 patch.object(check, "loaded_modules", side_effect=OSError("module enumeration failed")), \
+                 self.assertRaises(OSError):
+                with check.validation_log(log) as output:
+                    check.smoke(root, root, {}, output)
+            process.kill.assert_called_once()
+            self.assertIn("GUI startup diagnostics", log.read_text())
+            self.assertIn("module enumeration failed", log.read_text())
+
+    def test_module_audit_requires_app_and_gtk(self):
+        root, windows = Path("/package"), Path("/Windows")
+        for paths in ([], [root / "bin/music.exe"], [windows / "System32/kernel32.dll"]):
+            with self.subTest(paths=paths), self.assertRaisesRegex(ValueError, "did not observe"):
+                check.verify_module_paths(paths, root, windows)
+        valid = [root / "bin/music.exe", root / "bin/libgtk-4-1.dll", windows / "System32/kernel32.dll"]
+        check.verify_module_paths(valid, root, windows)
+        with self.assertRaisesRegex(ValueError, "outside package"):
+            check.verify_module_paths(valid + [Path("/development/bin/other.dll")], root, windows)
+
+    def test_archive_members_have_exactly_one_root(self):
+        self.assertEqual(check.archive_root(["MUSIC/bin/music.exe", "MUSIC/manifest.json"]), "MUSIC")
+        for names in (["MUSIC/bin/music.exe", "outside.exe"], ["MUSIC/a", "other/b"], []):
+            with self.subTest(names=names), self.assertRaises(ValueError):
+                check.archive_root(names)
+
+    def test_archive_rejects_collisions_and_windows_ambiguous_names(self):
+        for names in (["MUSIC/a", "MUSIC/a"], ["MUSIC/a", "MUSIC/A"], ["MUSIC/NUL.txt"],
+                      ["MUSIC/CON"], ["MUSIC/file."], ["MUSIC/file "], ["MUSIC/../escape"],
+                      ["/absolute/file"], ["MUSIC/a:b"], ["MUSIC/./file"], ["MUSIC//file"]):
+            with self.subTest(names=names), self.assertRaises(ValueError):
+                check.archive_root(names)
 
 
 if __name__ == "__main__":

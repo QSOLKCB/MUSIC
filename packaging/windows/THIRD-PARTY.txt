@@ -16,9 +16,13 @@ https://github.com/msys2/MINGW-packages
 https://packages.msys2.org/
 https://repo.msys2.org/mingw/sources/
 
-This is an unsigned engineering preview, not a signed installer. Before a
-public binary release, retain and provide the corresponding source archives
-and build recipes for the exact dependency versions being redistributed, and
-review all applicable license obligations. Do not remove the dependency
-notices when redistributing this preview. Dynamic libraries remain replaceable;
+This is an unsigned, locally built engineering preview, not a redistributable
+binary release. Do not publish or share the dependency-bearing ZIP until the
+matching corresponding-source archives and build recipes have been collected,
+made available with the binaries as required, and the redistribution obligations
+of every bundled dependency have been reviewed. Calling a package a preview or
+using dynamic linkage does not remove those obligations. CI therefore uploads
+only validation logs, inventories and hashes, never this ZIP or bundled DLLs.
+
+Do not remove the dependency notices. Dynamic libraries remain replaceable;
 MUSIC does not prevent users from substituting compatible library builds.

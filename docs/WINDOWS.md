@@ -1,7 +1,8 @@
 # Native Windows desktop preview
 
 The supported build path for this milestone is **Windows x64, MSYS2 UCRT64,
-GTK 4.10+ and GCC**. The result is a portable, unsigned ZIP, not an installer.
+GTK 4.10+ and GCC**. The local result is a portable, unsigned ZIP, not an installer or a redistributable
+binary release. CI uploads validation evidence only, not the ZIP.
 The existing MSVC core/CLI job remains separate. Neither build path establishes
 physical microphone/speaker acceptance; use [the hardware checklist](DEVICE-ACCEPTANCE.md).
 
@@ -28,9 +29,11 @@ elsewhere before rebuilding; it never deletes a previous package for you.
 
 The GTK dependency route follows the [official Windows GTK guidance](https://www.gtk.org/docs/installations/windows/).
 MSYS2 packages are rolling; this is not a bit-reproducible dependency lock. CI
-pins the setup action by commit and records exact installed package versions,
-source commit/tree, dirty-checkout state, runtime ownership, and packaged file
-hashes inside the ZIP. miniaudio remains pinned and checksum-verified by CMake.
+uses the runner-provided MSYS2 installation, GitHub-owned Actions pinned by commit,
+and records exact installed package versions,
+source commit/tree (dirty checkouts are refused), runtime ownership, and packaged file
+hashes inside the ZIP. These hashes detect corruption; they are not signatures or
+authenticity guarantees. miniaudio remains pinned and checksum-verified by CMake.
 
 ## Run the ZIP
 
@@ -61,9 +64,12 @@ GIO network/TLS modules are needed for this local-file application.
 `manifest.json` records payload hashes and DLL package ownership;
 `runtime-packages.txt` records runtime package metadata; `build-packages.txt`
 records the complete build inventory. `share/licenses` includes dependency
-license texts installed by MSYS2. See `THIRD-PARTY.txt`: a public binary
-release still needs the matching corresponding-source archive collection and
-license review. This engineering artifact is not a release declaration.
+license texts installed by MSYS2. See `THIRD-PARTY.txt`: **do not publish or share
+the dependency-bearing ZIP** until matching corresponding-source archives and
+build recipes are collected, provided alongside the binaries as required, and
+redistribution obligations are reviewed. A preview label or dynamic linkage
+does not waive the licenses of bundled libraries. CI does not upload the ZIP or
+DLLs; it retains only logs, manifests, package inventories and hashes.
 
 ## What the automated check proves
 
@@ -75,9 +81,10 @@ and SVG loading with `music-runtime-check.exe`.
 
 It then runs the packaged `music.exe --smoke`: native widget edits, playback,
 null-device recording, save, export and reopen. While it runs, the verifier checks
-the child's loaded module paths and rejects DLLs outside the extracted package
-or Windows directory. The smoke log and ZIP are retained by the Windows desktop
-CI job for 14 days. A green job is not a physical audio, latency, Windows file
+the child's loaded module paths, requires the packaged application/GTK DLL in
+the snapshot, and rejects DLLs outside the extracted package or Windows directory.
+The smoke log, manifests, package inventories and ZIP hash (not the ZIP) are
+retained by the Windows desktop CI job for 14 days. A green job is not a physical audio, latency, Windows file
 picker, hardware-GPU, installer-signing, or clean-VM acceptance result.
 
 Portable Python tests also check missing transitive dependencies, dependency
