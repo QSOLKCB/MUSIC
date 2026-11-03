@@ -72,7 +72,20 @@ jobs:
       # Use the runner's installed toolchain manager, not a third-party Action.
       # Separate shells let an MSYS2 runtime upgrade finish before dependency setup.
       - name: Update runner-provided MSYS2
-        run: pacman --noconfirm -Syu
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $output = & 'C:\msys64\usr\bin\bash.exe' -lc 'pacman --noconfirm -Syu' 2>&1
+          $code = $LASTEXITCODE
+          $output | Tee-Object -FilePath artifacts/msys2-update.log | Write-Host
+          # A core-runtime upgrade deliberately closes its Bash process. Only
+          # this documented restart outcome is accepted; all other failures stop.
+          $restart = ($output -join "`n") -match 'To complete this update all MSYS2 processes including this terminal will be closed'
+          if ($code -ne 0 -and !($code -eq 1 -and $restart)) {
+            throw "MSYS2 update failed with exit code $code."
+          }
+          $global:LASTEXITCODE = 0
       - name: Install native Windows GTK toolchain
         run: |
           pacman --noconfirm -Syu --needed git \
@@ -99,5 +112,6 @@ jobs:
             dist/MUSIC-windows-x64/runtime-packages.txt
             dist/MUSIC-windows-x64/build-packages.txt
             artifacts/windows-package-smoke.log
+            artifacts/msys2-update.log
           if-no-files-found: ignore
           retention-days: 14
