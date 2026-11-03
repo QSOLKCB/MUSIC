@@ -103,8 +103,9 @@ def build_package(build, prefix, destination, source):
         raise ValueError("Run with the native MSYS2 UCRT64 Python on Windows")
     if destination.exists():
         raise ValueError(f"Refusing to overwrite package output: {destination}")
-    if run("git", "-C", source, "status", "--porcelain").strip():
-        raise ValueError("Package only a clean checkout so HEAD identifies the actual source")
+    dirty = run("git", "-C", source, "status", "--porcelain").strip()
+    if dirty:
+        raise ValueError("Package only a clean checkout so HEAD identifies the actual source:\n" + dirty)
     source_commit = run("git", "-C", source, "rev-parse", "HEAD").strip()
     source_tree = run("git", "-C", source, "rev-parse", "HEAD^{tree}").strip()
     objdump = prefix / "bin/objdump.exe"
