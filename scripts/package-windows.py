@@ -32,10 +32,10 @@ def imports(binary, objdump):
     return names
 
 
-def dll_index(directory):
+def dll_index(directory, suffixes=(".dll",)):
     result = {}
     for path in directory.glob("*"):
-        if path.is_file() and path.suffix.lower() == ".dll":
+        if path.is_file() and path.suffix.lower() in suffixes:
             key = path.name.lower()
             if key in result:
                 raise ValueError(f"Duplicate case-insensitive DLL: {path}")
@@ -109,7 +109,7 @@ def build_package(build, prefix, destination, source):
     source_commit = run("git", "-C", source, "rev-parse", "HEAD").strip()
     source_tree = run("git", "-C", source, "show", "-s", "--format=%T", "HEAD").strip()
     objdump = prefix / "bin/objdump.exe"
-    system = dll_index(Path(os.environ["SystemRoot"]) / "System32")
+    system = dll_index(Path(os.environ["SystemRoot"]) / "System32", (".dll", ".drv"))
     bin_dir = destination / "bin"
     bin_dir.mkdir(parents=True)
     for name in ("music.exe", "music-cli.exe", "music-runtime-check.exe"):

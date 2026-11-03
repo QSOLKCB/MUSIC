@@ -157,6 +157,18 @@ class PackagingTests(unittest.TestCase):
             with self.subTest(names=names), self.assertRaises(ValueError):
                 check.archive_root(names)
 
+    def test_system_driver_import_requires_an_existing_system_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            system_dir = Path(temp)
+            (system_dir / "WINSPOOL.DRV").write_bytes(b"synthetic PE test placeholder")
+            self.assertNotIn("winspool.drv", package.dll_index(system_dir))
+            system = package.dll_index(system_dir, (".dll", ".drv"))
+            files, external = package.dependency_closure(["gtk"], {}, system, lambda _: ["WINSPOOL.DRV"])
+            self.assertEqual(files, [])
+            self.assertEqual(external, ["winspool.drv"])
+            with self.assertRaisesRegex(ValueError, "Unresolved DLL missing.drv"):
+                package.dependency_closure(["gtk"], {}, system, lambda _: ["missing.drv"])
+
 
 if __name__ == "__main__":
     unittest.main()
