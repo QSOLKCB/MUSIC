@@ -14,7 +14,7 @@
 typedef struct {
     char name[128];
     int16_t *samples; /* Owned, interleaved stereo at 48 kHz. */
-    uint32_t frames, offset, trim_in, trim_out, gain;
+    uint32_t frames, capacity, offset, trim_in, trim_out, gain; /* capacity includes retained spare PCM. */
     unsigned mute, solo;
 } MusicTrackData;
 typedef struct { MusicTrackData tracks[MUSIC_TRACKS]; unsigned count, bpm; } MusicProject;
@@ -28,6 +28,9 @@ int music_valid(const MusicProject *project);
 uint32_t music_duration(const MusicProject *project);
 int music_add_pcm(MusicProject *project, const char *name, int16_t *owned_stereo,
                   uint32_t frames, uint32_t offset, char error[256]);
+/* Takes ownership only on success; capacity is the allocated stereo frame count. */
+int music_add_pcm_capacity(MusicProject *project, const char *name, int16_t *owned_stereo,
+                           uint32_t frames, uint32_t capacity, uint32_t offset, char error[256]);
 int music_import_wav(MusicProject *project, const char *name,
                      const unsigned char *data, size_t size, char error[256]);
 void music_render(const MusicProject *project, uint32_t start, uint32_t frames, int16_t *stereo);

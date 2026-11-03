@@ -77,19 +77,33 @@ int audio_start(MusicAudio *a,const MusicProject *p,uint32_t start,int record,ch
     }
     a->active=1; return 1;
 }
-int16_t *audio_stop(MusicAudio *a,uint32_t *frames,uint32_t *start) {
-    int16_t *data=NULL; *frames=0; *start=0;
+int16_t *audio_stop(MusicAudio *a,uint32_t *frames,uint32_t *start,uint32_t *capacity) {
+    int16_t *data=NULL; *frames=0; *start=0; *capacity=0;
     if(a && a->active) {
         ma_device_uninit(&a->device); a->active=0;
-        if(a->record) { *frames=(uint32_t)ma_atomic_load_64(&a->cursor)-a->start; *start=a->start; data=a->capture; a->capture=NULL; }
+        if(a->record) {
+            ma_uint64 cursor=ma_atomic_load_64(&a->cursor);
+            /* Validate before narrowing/subtracting. The callback is now joined. */
+            if(a->capture && cursor>a->start && cursor-a->start<=a->capacity) {
+                int16_t *compact;
+                *frames=(uint32_t)(cursor-a->start); *start=a->start;
+                *capacity=a->capacity; data=a->capture;
+                if(*frames<*capacity) {
+                    compact=(int16_t*)realloc(data,(size_t)*frames*4);
+                    if(compact) { data=compact; *capacity=*frames; }
+                    /* On OOM retain the take, but charge its full allocation. */
+                }
+            } else free(a->capture); /* Empty or invalid capture cannot be retained. */
+            a->capture=NULL; a->capacity=0;
+        }
         a->record=0;
     }
     return data;
 }
 void audio_free(MusicAudio *a) {
-    uint32_t frames,start;
+    uint32_t frames,start,capacity;
     if(!a) return;
-    free(audio_stop(a,&frames,&start)); free(a->capture);
+    free(audio_stop(a,&frames,&start,&capacity)); free(a->capture);
     if(a->context_ready) ma_context_uninit(&a->context);
     free(a);
 }

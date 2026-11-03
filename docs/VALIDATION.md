@@ -9,6 +9,12 @@ This is a source preview. Executed checks and unverified areas are kept separate
 - Deterministic demo WAV SHA-256: `79e190e03151525c844b882cc2c3174fe6be7651d9fe29d7dc2584b7b72c301a`.
 - Pinned miniaudio adapter compiled as C99 against version 0.11.26, commit `877ea4a7c2601c7b0f2a44e83dfac42e6470fea6`.
 
+## Recording-capacity regression (3 November 2026)
+
+The hardware-free `audio-capacity` CTest compiles the production `audio.c` against a device seam and an allocation ledger. It checks 16 one-second takes retain 3,072,000 requested PCM bytes rather than 1,843,200,000; checks join-before-reallocation, sample preservation, empty/full takes, invalid 64-bit cursors and repeated stop; and injects shrink failure to verify ownership and full-capacity budget enforcement. The core suite additionally checks spare-capacity save/load writes only captured frames. This is not a physical-device/thread-scheduling or whole-process RSS test.
+
+Strict GCC C99 compilation and both test executables passed locally, including ASan/UBSan with leak detection disabled for the same workspace restriction above. Updated cross-platform results must be read at the exact PR head; the historical CI result below is not evidence for this fix.
+
 ## Executed in CI
 
 All five jobs passed in [run 41547037825](https://github.com/QSOLKCB/MUSIC/actions/runs/41547037825) at commit `846578ef83afdd96629722ae4f61f32bffe34137` on 2 November 2026 UTC:

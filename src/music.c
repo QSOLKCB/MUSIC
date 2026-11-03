@@ -29,7 +29,7 @@ void music_remove(MusicProject *p, unsigned i) {
 }
 size_t music_memory(const MusicProject *p) {
     size_t total=0; unsigned i;
-    for (i=0;i<p->count;++i) total += (size_t)p->tracks[i].frames * 4;
+    for (i=0;i<p->count;++i) total += (size_t)p->tracks[i].capacity * 4;
     return total;
 }
 int music_valid(const MusicProject *p) {
@@ -38,6 +38,7 @@ int music_valid(const MusicProject *p) {
     for (i=0;i<p->count;++i) {
         const MusicTrackData *t=&p->tracks[i];
         if (!t->samples || !t->frames || t->frames>MUSIC_CLIP_FRAMES ||
+            t->capacity<t->frames || t->capacity>MUSIC_CLIP_FRAMES ||
             t->trim_in>=t->trim_out || t->trim_out>t->frames ||
             t->offset>MUSIC_TIMELINE_FRAMES-(t->trim_out-t->trim_in) ||
             t->gain>4*MUSIC_UNITY || t->mute>1 || t->solo>1 ||
@@ -54,14 +55,20 @@ uint32_t music_duration(const MusicProject *p) {
     return end;
 }
 int music_add_pcm(MusicProject *p,const char *name,int16_t *samples,uint32_t frames,uint32_t offset,char error[256]) {
-    MusicTrackData *t;
+    return music_add_pcm_capacity(p,name,samples,frames,frames,offset,error);
+}
+int music_add_pcm_capacity(MusicProject *p,const char *name,int16_t *samples,uint32_t frames,uint32_t capacity,uint32_t offset,char error[256]) {
+    MusicTrackData *t; size_t used;
+    if (!music_valid(p)) return fail(error,"Invalid project.");
+    if (capacity<frames || capacity>MUSIC_CLIP_FRAMES) return fail(error,"Invalid PCM allocation capacity.");
     if (!samples || !frames || frames>MUSIC_CLIP_FRAMES) return fail(error,"Clip must contain 1 frame to 10 minutes of audio.");
     if (p->count>=MUSIC_TRACKS) return fail(error,"This preview supports 16 tracks.");
     if (offset>MUSIC_TIMELINE_FRAMES-frames) return fail(error,"Arrangement exceeds the 30-minute preview limit.");
-    if ((size_t)frames*4 > MUSIC_MEMORY_LIMIT-music_memory(p)) return fail(error,"Project audio exceeds the 256 MiB preview limit.");
+    used=music_memory(p);
+    if ((size_t)capacity*4 > MUSIC_MEMORY_LIMIT-used) return fail(error,"Project audio exceeds the 256 MiB preview limit.");
     t=&p->tracks[p->count++]; memset(t,0,sizeof(*t));
     snprintf(t->name,sizeof(t->name),"%s",name); t->samples=samples;
-    t->frames=t->trim_out=frames; t->offset=offset; t->gain=MUSIC_UNITY;
+    t->frames=t->trim_out=frames; t->capacity=capacity; t->offset=offset; t->gain=MUSIC_UNITY;
     return 1;
 }
 

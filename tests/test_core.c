@@ -42,6 +42,16 @@ static void project_roundtrip(void) {
     CHECK(!memcmp(values,loaded.tracks[0].samples,sizeof(values)));CHECK(music_save(&loaded,collect,&b,error));
     CHECK(a.size==b.size && !memcmp(a.data,b.data,a.size));free(a.data);free(b.data);music_free(&p);music_free(&loaded);++passed;
 }
+static void spare_capacity_roundtrip(void) {
+    MusicProject p,q;char error[256];Buffer b=buffer();int16_t *samples=malloc(400);
+    CHECK(samples);memset(samples,0x7f,400);samples[0]=123;samples[1]=-123;
+    music_init(&p);music_init(&q);
+    CHECK(music_add_pcm_capacity(&p,"spare",samples,1,100,0,error));CHECK(music_memory(&p)==400);
+    CHECK(music_save(&p,collect,&b,error));CHECK(b.size==20+28+5+4);
+    CHECK(music_load(&q,b.data,b.size,error));CHECK(q.tracks[0].capacity==1 && music_memory(&q)==4);
+    CHECK(q.tracks[0].samples[0]==123 && q.tracks[0].samples[1]==-123);
+    free(b.data);music_free(&p);music_free(&q);++passed;
+}
 static void rejection_preserves_project(void) {
     MusicProject p;char error[256];Buffer b=buffer();int16_t data[]={11,22};size_t i;music_init(&p);add(&p,data,1,0);CHECK(music_save(&p,collect,&b,error));
     for(i=0;i<b.size;++i) {CHECK(!music_load(&p,b.data,i,error));CHECK(p.count==1 && p.tracks[0].samples[0]==11);}
@@ -86,6 +96,6 @@ static void demo_export(void) {
     file=fopen("demo-reference.wav","wb");CHECK(file);CHECK(music_export_wav(&p,file_write,file,error));CHECK(!fclose(file));music_free(&p);++passed;
 }
 int main(void) {
-    mixing();negative_clipping();project_roundtrip();rejection_preserves_project();wav_roundtrip_and_invalid();mono_resampling();write_failure();limits();demo_export();
+    mixing();negative_clipping();project_roundtrip();spare_capacity_roundtrip();rejection_preserves_project();wav_roundtrip_and_invalid();mono_resampling();write_failure();limits();demo_export();
     printf("PASS: %u core test groups (mixing, clipping, projects, malformed input, WAV, resampling, write failure, limits, deterministic render).\n",passed);return 0;
 }

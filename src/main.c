@@ -208,11 +208,11 @@ static void drag_update(GtkGestureDrag *gesture,double dx,double dy,gpointer dat
     a->dirty=1; properties(a); refresh(a);
 }
 static void stop_audio(App *a) {
-    uint32_t frames,start; int16_t *captured; char error[256]; int was_recording=audio_recording(a->audio);
+    uint32_t frames,start,capacity; int16_t *captured; char error[256]; int was_recording=audio_recording(a->audio);
     if(!audio_active(a->audio)) return;
-    captured=audio_stop(a->audio,&frames,&start); a->position=audio_position(a->audio);
+    captured=audio_stop(a->audio,&frames,&start,&capacity); a->position=audio_position(a->audio);
     if(captured && frames) {
-        if(music_add_pcm(&a->project,"Recorded take",captured,frames,start,error)) {
+        if(music_add_pcm_capacity(&a->project,"Recorded take",captured,frames,capacity,start,error)) {
             a->dirty=1; a->selected=a->project.count-1; rebuild_peaks(a); rebuild_tracks(a); status(a,"Take added. Save the project to keep it.");
         } else { free(captured); status(a,error); }
     } else { free(captured); status(a,was_recording?"No audio frames were captured.":"Stopped."); }

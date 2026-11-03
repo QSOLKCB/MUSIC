@@ -4,6 +4,8 @@
 
 `src/audio.c` wraps pinned miniaudio device I/O. The main thread freezes project edits before starting the device and joins device callbacks before editing or freeing PCM. Recording storage is allocated before the callback starts, within remaining project limits. The callback mixes output and copies input into that allocation; it does not perform file I/O or allocate memory. Cursor/completion exchange uses miniaudio's pinned portable atomic helpers. No software microphone monitoring is mixed into the speakers.
 
+Stopping a take joins the device before shrinking its allocation to captured frames. Empty takes are freed. If shrinking fails, the original take remains owned and its full allocated frame capacity is charged by `music_memory`, reducing the space available to subsequent recordings/imports. Logical frames alone determine rendering and serialization; spare capacity is never written to projects. The project format is unchanged. Capacity denotes requested PCM allocation bytes, not allocator bookkeeping or whole-process RSS.
+
 `src/main.c` owns the GTK window and file workers. A file operation locks edits until completion. Saves and exports go to a private, exclusive temporary file beside the destination; a complete, closed file replaces the chosen destination. Cancellation and failures remove the temporary output. A failed project read leaves the live project intact. No folder cleanup or source-audio rewriting is performed.
 
 The playback/capture callback's nominal cursor is used for take placement. Real device latency, sample-clock behaviour, dropouts, and microphone permission flows require hardware acceptance testing; the null backend does not establish those properties.
