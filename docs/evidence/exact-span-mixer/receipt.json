@@ -1,0 +1,637 @@
+{
+  "date_utc": "2026-11-03",
+  "base_commit": "25228d4f943862c5dde526e381a26703f60cde4e",
+  "opt_commit": "7556dd36acd53ed3ed538fd03b1db44e5c1ec869",
+  "compiler": "cc (Debian 14.2.0-19) 14.2.0",
+  "flags": "-O3 -std=c99 -Wall -Wextra -Wpedantic -Werror -Isrc",
+  "host": "Linux x86_64; /proc/cpuinfo AMD EPYC 9V74 80-Core Processor; shared workspace, affinity not pinned",
+  "timer": "C99 clock process CPU seconds",
+  "sha256": {
+    "src/music.c": "f1902443f7acf9bd6f0f45539340ac41ea8ae8c4baa158fabbca0c1a251369ae",
+    "tests/test_render.c": "c5ef9a364743177910b6e80d50295da43df2d096a8c02d4cb61ed423272d6534",
+    "tests/render_reference.c": "3eaed32121d8d968ffb19f7c59eb55a873dcabb5fc4808fbcf66dbe6bfe74e15",
+    "CMakeLists.txt": "373eb7f126ccd85c6b308779e95fa2360486806aa3bf47567537a905be2732fd",
+    "docs/evidence/exact-span-mixer/benchmark.csv": "0318042dadec37d739bb02dbc0b2f1ce81ecc994e70a4e560393d805441eeb72",
+    "docs/evidence/exact-span-mixer/initial-candidate.csv": "d22901a881266a9f84275c9473019e81ebf233dfe8484f2b097ff9889e195a46",
+    "src/music.h": "a20c64c930bb9665be343c692751057e697c77d32db7d17742188cec95071e95"
+  },
+  "summaries": [
+    {
+      "mode": 0,
+      "tracks": 0,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.000375,
+      "optimized_median_seconds": 6.6e-05,
+      "reference_range_seconds": [
+        0.000344,
+        0.00048
+      ],
+      "optimized_range_seconds": [
+        6.5e-05,
+        7.7e-05
+      ],
+      "median_ratio": 5.681818181818182
+    },
+    {
+      "mode": 0,
+      "tracks": 0,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.001316,
+      "optimized_median_seconds": 0.00013,
+      "reference_range_seconds": [
+        0.001292,
+        0.001529
+      ],
+      "optimized_range_seconds": [
+        0.00013,
+        0.000131
+      ],
+      "median_ratio": 10.123076923076923
+    },
+    {
+      "mode": 0,
+      "tracks": 0,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.005771,
+      "optimized_median_seconds": 0.000462,
+      "reference_range_seconds": [
+        0.005492,
+        0.006027
+      ],
+      "optimized_range_seconds": [
+        0.000442,
+        0.00061
+      ],
+      "median_ratio": 12.491341991341992
+    },
+    {
+      "mode": 0,
+      "tracks": 1,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.002317,
+      "optimized_median_seconds": 0.002057,
+      "reference_range_seconds": [
+        0.00211,
+        0.002655
+      ],
+      "optimized_range_seconds": [
+        0.001885,
+        0.002189
+      ],
+      "median_ratio": 1.1263976665046185
+    },
+    {
+      "mode": 0,
+      "tracks": 1,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.008478,
+      "optimized_median_seconds": 0.007677,
+      "reference_range_seconds": [
+        0.008242,
+        0.009509
+      ],
+      "optimized_range_seconds": [
+        0.006855,
+        0.008063
+      ],
+      "median_ratio": 1.104337631887456
+    },
+    {
+      "mode": 0,
+      "tracks": 1,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.034654,
+      "optimized_median_seconds": 0.028277,
+      "reference_range_seconds": [
+        0.033357,
+        0.036383
+      ],
+      "optimized_range_seconds": [
+        0.027496,
+        0.029745
+      ],
+      "median_ratio": 1.2255189730169396
+    },
+    {
+      "mode": 0,
+      "tracks": 8,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.00983,
+      "optimized_median_seconds": 0.006402,
+      "reference_range_seconds": [
+        0.009588,
+        0.011499
+      ],
+      "optimized_range_seconds": [
+        0.005993,
+        0.010904
+      ],
+      "median_ratio": 1.5354576694782882
+    },
+    {
+      "mode": 0,
+      "tracks": 8,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.038903,
+      "optimized_median_seconds": 0.02396,
+      "reference_range_seconds": [
+        0.038261,
+        0.071709
+      ],
+      "optimized_range_seconds": [
+        0.023775,
+        0.024647
+      ],
+      "median_ratio": 1.6236644407345577
+    },
+    {
+      "mode": 0,
+      "tracks": 8,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.152909,
+      "optimized_median_seconds": 0.094196,
+      "reference_range_seconds": [
+        0.149988,
+        0.155692
+      ],
+      "optimized_range_seconds": [
+        0.09329,
+        0.095925
+      ],
+      "median_ratio": 1.623306722153807
+    },
+    {
+      "mode": 0,
+      "tracks": 16,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.017821,
+      "optimized_median_seconds": 0.010009,
+      "reference_range_seconds": [
+        0.017624,
+        0.018395
+      ],
+      "optimized_range_seconds": [
+        0.009994,
+        0.010613
+      ],
+      "median_ratio": 1.780497552203017
+    },
+    {
+      "mode": 0,
+      "tracks": 16,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.075767,
+      "optimized_median_seconds": 0.041534,
+      "reference_range_seconds": [
+        0.071916,
+        0.084067
+      ],
+      "optimized_range_seconds": [
+        0.038109,
+        0.044434
+      ],
+      "median_ratio": 1.82421630471421
+    },
+    {
+      "mode": 0,
+      "tracks": 16,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.363407,
+      "optimized_median_seconds": 0.14562,
+      "reference_range_seconds": [
+        0.336574,
+        0.456906
+      ],
+      "optimized_range_seconds": [
+        0.14537,
+        0.163491
+      ],
+      "median_ratio": 2.495584397747562
+    },
+    {
+      "mode": 1,
+      "tracks": 0,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.000345,
+      "optimized_median_seconds": 6.2e-05,
+      "reference_range_seconds": [
+        0.000344,
+        0.000362
+      ],
+      "optimized_range_seconds": [
+        6.2e-05,
+        7.6e-05
+      ],
+      "median_ratio": 5.564516129032257
+    },
+    {
+      "mode": 1,
+      "tracks": 0,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.001296,
+      "optimized_median_seconds": 0.00013,
+      "reference_range_seconds": [
+        0.001292,
+        0.001318
+      ],
+      "optimized_range_seconds": [
+        0.00013,
+        0.000153
+      ],
+      "median_ratio": 9.969230769230771
+    },
+    {
+      "mode": 1,
+      "tracks": 0,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.00517,
+      "optimized_median_seconds": 0.000456,
+      "reference_range_seconds": [
+        0.005162,
+        0.00531
+      ],
+      "optimized_range_seconds": [
+        0.000442,
+        0.000458
+      ],
+      "median_ratio": 11.337719298245613
+    },
+    {
+      "mode": 1,
+      "tracks": 1,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.00203,
+      "optimized_median_seconds": 0.001805,
+      "reference_range_seconds": [
+        0.002013,
+        0.00204
+      ],
+      "optimized_range_seconds": [
+        0.001788,
+        0.002032
+      ],
+      "median_ratio": 1.1246537396121885
+    },
+    {
+      "mode": 1,
+      "tracks": 1,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.008045,
+      "optimized_median_seconds": 0.006797,
+      "reference_range_seconds": [
+        0.008037,
+        0.008069
+      ],
+      "optimized_range_seconds": [
+        0.006763,
+        0.006835
+      ],
+      "median_ratio": 1.1836104163601588
+    },
+    {
+      "mode": 1,
+      "tracks": 1,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.031973,
+      "optimized_median_seconds": 0.026461,
+      "reference_range_seconds": [
+        0.031893,
+        0.032061
+      ],
+      "optimized_range_seconds": [
+        0.026306,
+        0.026536
+      ],
+      "median_ratio": 1.2083065643777637
+    },
+    {
+      "mode": 1,
+      "tracks": 8,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.004261,
+      "optimized_median_seconds": 0.002345,
+      "reference_range_seconds": [
+        0.004213,
+        0.004494
+      ],
+      "optimized_range_seconds": [
+        0.002336,
+        0.002359
+      ],
+      "median_ratio": 1.8170575692963753
+    },
+    {
+      "mode": 1,
+      "tracks": 8,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.017088,
+      "optimized_median_seconds": 0.008848,
+      "reference_range_seconds": [
+        0.016497,
+        0.017212
+      ],
+      "optimized_range_seconds": [
+        0.008832,
+        0.008874
+      ],
+      "median_ratio": 1.9312839059674503
+    },
+    {
+      "mode": 1,
+      "tracks": 8,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.06573,
+      "optimized_median_seconds": 0.034336,
+      "reference_range_seconds": [
+        0.064976,
+        0.067212
+      ],
+      "optimized_range_seconds": [
+        0.034309,
+        0.034477
+      ],
+      "median_ratio": 1.9143173345759552
+    },
+    {
+      "mode": 1,
+      "tracks": 16,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.007516,
+      "optimized_median_seconds": 0.003134,
+      "reference_range_seconds": [
+        0.007202,
+        0.008395
+      ],
+      "optimized_range_seconds": [
+        0.003116,
+        0.003169
+      ],
+      "median_ratio": 2.398213146139119
+    },
+    {
+      "mode": 1,
+      "tracks": 16,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.030921,
+      "optimized_median_seconds": 0.011809,
+      "reference_range_seconds": [
+        0.029763,
+        0.032476
+      ],
+      "optimized_range_seconds": [
+        0.011773,
+        0.011834
+      ],
+      "median_ratio": 2.618426623761538
+    },
+    {
+      "mode": 1,
+      "tracks": 16,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.159662,
+      "optimized_median_seconds": 0.046239,
+      "reference_range_seconds": [
+        0.157585,
+        0.164337
+      ],
+      "optimized_range_seconds": [
+        0.046206,
+        0.046433
+      ],
+      "median_ratio": 3.452972598888384
+    },
+    {
+      "mode": 2,
+      "tracks": 0,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.000345,
+      "optimized_median_seconds": 6.5e-05,
+      "reference_range_seconds": [
+        0.000344,
+        0.000376
+      ],
+      "optimized_range_seconds": [
+        6.2e-05,
+        8e-05
+      ],
+      "median_ratio": 5.3076923076923075
+    },
+    {
+      "mode": 2,
+      "tracks": 0,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.001296,
+      "optimized_median_seconds": 0.00013,
+      "reference_range_seconds": [
+        0.001293,
+        0.001321
+      ],
+      "optimized_range_seconds": [
+        0.00013,
+        0.000143
+      ],
+      "median_ratio": 9.969230769230771
+    },
+    {
+      "mode": 2,
+      "tracks": 0,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.005171,
+      "optimized_median_seconds": 0.000442,
+      "reference_range_seconds": [
+        0.005166,
+        0.005194
+      ],
+      "optimized_range_seconds": [
+        0.000441,
+        0.000469
+      ],
+      "median_ratio": 11.699095022624435
+    },
+    {
+      "mode": 2,
+      "tracks": 1,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.001825,
+      "optimized_median_seconds": 0.000645,
+      "reference_range_seconds": [
+        0.001816,
+        0.001836
+      ],
+      "optimized_range_seconds": [
+        0.00064,
+        0.000669
+      ],
+      "median_ratio": 2.8294573643410854
+    },
+    {
+      "mode": 2,
+      "tracks": 1,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.006978,
+      "optimized_median_seconds": 0.000692,
+      "reference_range_seconds": [
+        0.00697,
+        0.007072
+      ],
+      "optimized_range_seconds": [
+        0.000678,
+        0.000708
+      ],
+      "median_ratio": 10.083815028901734
+    },
+    {
+      "mode": 2,
+      "tracks": 1,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.027324,
+      "optimized_median_seconds": 0.001039,
+      "reference_range_seconds": [
+        0.027278,
+        0.027517
+      ],
+      "optimized_range_seconds": [
+        0.001017,
+        0.001048
+      ],
+      "median_ratio": 26.298363811357074
+    },
+    {
+      "mode": 2,
+      "tracks": 8,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.006381,
+      "optimized_median_seconds": 0.002637,
+      "reference_range_seconds": [
+        0.005774,
+        0.006914
+      ],
+      "optimized_range_seconds": [
+        0.002597,
+        0.002764
+      ],
+      "median_ratio": 2.4197952218430037
+    },
+    {
+      "mode": 2,
+      "tracks": 8,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.0254,
+      "optimized_median_seconds": 0.0079,
+      "reference_range_seconds": [
+        0.024979,
+        0.02614
+      ],
+      "optimized_range_seconds": [
+        0.007892,
+        0.007919
+      ],
+      "median_ratio": 3.215189873417721
+    },
+    {
+      "mode": 2,
+      "tracks": 8,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.093106,
+      "optimized_median_seconds": 0.009172,
+      "reference_range_seconds": [
+        0.092752,
+        0.093933
+      ],
+      "optimized_range_seconds": [
+        0.009163,
+        0.009243
+      ],
+      "median_ratio": 10.151112080244221
+    },
+    {
+      "mode": 2,
+      "tracks": 16,
+      "frames": 64,
+      "pairs": 7,
+      "reference_median_seconds": 0.010423,
+      "optimized_median_seconds": 0.00321,
+      "reference_range_seconds": [
+        0.009784,
+        0.010643
+      ],
+      "optimized_range_seconds": [
+        0.003197,
+        0.003228
+      ],
+      "median_ratio": 3.2470404984423675
+    },
+    {
+      "mode": 2,
+      "tracks": 16,
+      "frames": 256,
+      "pairs": 7,
+      "reference_median_seconds": 0.044631,
+      "optimized_median_seconds": 0.013941,
+      "reference_range_seconds": [
+        0.043321,
+        0.047683
+      ],
+      "optimized_range_seconds": [
+        0.013757,
+        0.014431
+      ],
+      "median_ratio": 3.2014202711426725
+    },
+    {
+      "mode": 2,
+      "tracks": 16,
+      "frames": 1024,
+      "pairs": 7,
+      "reference_median_seconds": 0.201888,
+      "optimized_median_seconds": 0.028079,
+      "reference_range_seconds": [
+        0.167634,
+        0.204151
+      ],
+      "optimized_range_seconds": [
+        0.028038,
+        0.028198
+      ],
+      "median_ratio": 7.189999643861961
+    }
+  ],
+  "limitations": [
+    "Synthetic only; no hardware audio/latency guarantee",
+    "No independent performance run",
+    "Initial candidate source not retained; timings negative developmental evidence only"
+  ]
+}

@@ -33,6 +33,7 @@ int music_add_pcm_capacity(MusicProject *project, const char *name, int16_t *own
                            uint32_t frames, uint32_t capacity, uint32_t offset, char error[256]);
 int music_import_wav(MusicProject *project, const char *name,
                      const unsigned char *data, size_t size, char error[256]);
+/* Requires a valid project whose controls/storage remain stable during the call. */
 void music_render(const MusicProject *project, uint32_t start, uint32_t frames, int16_t *stereo);
 int music_export_wav(const MusicProject *project, MusicWrite write, void *context, char error[256]);
 int music_save(const MusicProject *project, MusicWrite write, void *context, char error[256]);

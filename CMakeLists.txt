@@ -59,3 +59,7 @@ if(MUSIC_BUILD_GUI)
 endif()
 install(TARGETS music-cli RUNTIME DESTINATION .)
 install(FILES LICENSE README.md docs/MINIAUDIO-LICENSE.txt DESTINATION .)
+
+add_executable(music-render-tests tests/test_render.c tests/render_reference.c)
+target_link_libraries(music-render-tests PRIVATE music-core)
+add_test(NAME render-equivalence COMMAND music-render-tests)
