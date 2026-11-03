@@ -135,6 +135,25 @@ class PackagingTests(unittest.TestCase):
             self.assertIn("GUI startup diagnostics", log.read_text())
             self.assertIn("module enumeration failed", log.read_text())
 
+    def test_module_membership_failure_retains_observed_paths(self):
+        with tempfile.TemporaryDirectory() as temp:
+            log = Path(temp) / "smoke.log"
+            process = MagicMock()
+            process.__enter__.return_value = process
+            process.poll.return_value = None
+            process.communicate.return_value = ("GUI diagnostics", None)
+            with patch.object(check.subprocess, "Popen", return_value=process), \
+                 patch.object(check.time, "sleep"), \
+                 patch.object(check, "snapshot_modules", return_value=[Path("/unexpected/music.exe")]), \
+                 patch.dict(check.os.environ, {"SystemRoot": temp}), \
+                 self.assertRaisesRegex(ValueError, "did not observe"):
+                with check.validation_log(log) as output:
+                    check.smoke(Path(temp) / "package", Path(temp), {}, output)
+            self.assertIn("unexpected", log.read_text())
+            self.assertIn("Module audit package root:", log.read_text())
+            self.assertIn("libgtk-4-1.dll", log.read_text())
+            self.assertIn("GUI diagnostics", log.read_text())
+
     def test_module_audit_requires_app_and_gtk(self):
         root, windows = Path("/package"), Path("/Windows")
         for paths in ([], [root / "bin/music.exe"], [windows / "System32/kernel32.dll"]):

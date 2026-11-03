@@ -77,7 +77,7 @@ def windows_error(operation):
     return error
 
 
-def loaded_modules(pid):
+def loaded_modules(pid, output):
     """Capture names in one Toolhelp snapshot, not live per-module PSAPI reads."""
     class ModuleEntry(ctypes.Structure):
         _fields_ = [("dwSize", wintypes.DWORD), ("th32ModuleID", wintypes.DWORD),
@@ -86,6 +86,9 @@ def loaded_modules(pid):
                     ("modBaseSize", wintypes.DWORD), ("hModule", wintypes.HMODULE),
                     ("szModule", wintypes.WCHAR * 256), ("szExePath", wintypes.WCHAR * 260)]
 
+    output.append(f"Module snapshot ABI: size={ctypes.sizeof(ModuleEntry)}, "
+                  f"WCHAR={ctypes.sizeof(wintypes.WCHAR)}, "
+                  f"path_offset={ModuleEntry.szExePath.offset}; PID={pid}")
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
     kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
@@ -108,7 +111,10 @@ def loaded_modules(pid):
             name = entry.szExePath
             if not name or len(name) >= 259:
                 raise ValueError("Empty or potentially truncated module snapshot path")
-            paths.append(Path(name).resolve())
+            output.append(f"Snapshot raw path: {name!r}")
+            resolved = Path(name).resolve()
+            output.append(f"Snapshot resolved path: {resolved!r}")
+            paths.append(resolved)
             if not kernel.Module32NextW(handle, ctypes.byref(entry)):
                 if ctypes.get_last_error() != 18:  # ERROR_NO_MORE_FILES
                     raise windows_error("Module32NextW")
@@ -126,7 +132,7 @@ def snapshot_modules(process, output):
         if process.poll() is not None:
             raise ValueError("GUI exited before its module snapshot")
         try:
-            return loaded_modules(process.pid)
+            return loaded_modules(process.pid, output)
         except OSError as error:
             retryable = (getattr(error, "winerror", None) == 24 and
                          getattr(error, "operation", None) == "CreateToolhelp32Snapshot")
@@ -139,7 +145,8 @@ def snapshot_modules(process, output):
 def verify_module_paths(paths, root, windows):
     required = {root / "bin/music.exe", root / "bin/libgtk-4-1.dll"}
     if not required.issubset(set(paths)):
-        raise ValueError("Module audit did not observe the packaged executable and GTK DLL")
+        raise ValueError("Module audit did not observe required package modules: " +
+                         ", ".join(str(path) for path in sorted(required - set(paths))))
     for path in paths:
         if not path.is_relative_to(root) and not path.is_relative_to(windows):
             raise ValueError(f"Loaded DLL outside package/Windows: {path}")
@@ -197,8 +204,9 @@ def smoke(root, cwd, env, output):
             time.sleep(1.5)
             paths = snapshot_modules(process, output)
             windows = Path(os.environ["SystemRoot"]).resolve()
-            verify_module_paths(paths, root, windows)
+            output.append(f"Module audit package root: {root}; Windows root: {windows}")
             output.append("Loaded modules:\n" + "\n".join(str(path) for path in paths))
+            verify_module_paths(paths, root, windows)
             stdout, _ = process.communicate(timeout=60)
             output.append(stdout)
             captured = True
