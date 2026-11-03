@@ -9,7 +9,7 @@ int main(void) {
     const char *svg=g_getenv("MUSIC_PACKAGE_SVG");
     if(!gtk_init_check()) { fputs("Cannot initialize native GTK.\n",stderr); return 1; }
     schemas=g_settings_schema_source_get_default();
-    schema=schemas?g_settings_schema_source_lookup(schemas,"org.gtk.Settings.FileChooser",TRUE):NULL;
+    schema=schemas?g_settings_schema_source_lookup(schemas,"org.gtk.gtk4.Settings.FileChooser",TRUE):NULL;
     if(!schema) { fputs("Bundled GTK file-chooser schema missing.\n",stderr); return 1; }
     g_settings_schema_unref(schema);
     if(!gtk_icon_theme_has_icon(gtk_icon_theme_get_for_display(gdk_display_get_default()),"document-open-symbolic")) {
