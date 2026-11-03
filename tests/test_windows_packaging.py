@@ -1,7 +1,7 @@
 """Portable negative tests for the Windows package assembler and verifier."""
 import importlib.util
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 import tempfile
 import subprocess
 import unittest
@@ -54,7 +54,7 @@ class PackagingTests(unittest.TestCase):
                 package.imports("x", "objdump")
 
     def test_relative_loader_cache_with_space_path(self):
-        prefix = Path("/build space/ucrt64")
+        prefix = Path("/build space/ucrt64").resolve()
         module = prefix / "lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.dll"
         result = package.relative_loader_cache(f'# build directory\n"{module}"\n"svg" 6 "gdk-pixbuf" "SVG" "LGPL"\n\n', prefix, [module])
         self.assertTrue(result.startswith('"lib/gdk-pixbuf-2.0/'))
@@ -69,8 +69,9 @@ class PackagingTests(unittest.TestCase):
             package.relative_loader_cache('"/outside/svg.dll"\n', Path("/prefix"), [])
 
     def test_unknown_loader_fails(self):
+        prefix = Path("/prefix").resolve()
         with self.assertRaisesRegex(ValueError, "Unexpected loader"):
-            package.relative_loader_cache('"/prefix/lib/other.dll"\n', Path("/prefix"), [])
+            package.relative_loader_cache(f'"{prefix / "lib/other.dll"}"\n', prefix, [])
 
     def test_missing_assets_fail(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -168,6 +169,32 @@ class PackagingTests(unittest.TestCase):
             self.assertEqual(external, ["winspool.drv"])
             with self.assertRaisesRegex(ValueError, "Unresolved DLL missing.drv"):
                 package.dependency_closure(["gtk"], {}, system, lambda _: ["missing.drv"])
+
+    def test_already_relative_loader_cache_matches_absolute_form(self):
+        prefix = Path("/build space/ucrt64").resolve()
+        relative = "lib/gdk-pixbuf-2.0/2.10.0/loaders/libpixbufloader-svg.dll"
+        modules = [prefix / relative]
+        absolute = package.relative_loader_cache(f'"{modules[0]}"\n', prefix, modules)
+        self.assertEqual(package.relative_loader_cache(f'"{relative}"\n', prefix, modules), absolute)
+
+    def test_relative_and_absolute_loader_escapes_fail(self):
+        prefix = Path("/prefix").resolve()
+        modules = [prefix / "lib/svg.dll"]
+        for path in ("../prefix/lib/svg.dll", "lib/../../outside/svg.dll", "/prefix/../outside/svg.dll",
+                     "C:lib/svg.dll", "/outside/svg.dll", "lib/other.dll"):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                package.relative_loader_cache(f'"{path}"\n', prefix, modules)
+
+    def test_windows_loader_path_semantics_on_any_host(self):
+        prefix = PureWindowsPath("C:/msys64/ucrt64")
+        modules = [prefix / "lib/svg.dll"]
+        with patch.object(package, "Path", PureWindowsPath):
+            absolute = package.relative_loader_cache('"C:/msys64/ucrt64/lib/svg.dll"\n', prefix, modules)
+            self.assertEqual(package.relative_loader_cache('"lib/svg.dll"\n', prefix, modules), absolute)
+            for path in ("C:lib/svg.dll", "/lib/svg.dll", "../lib/svg.dll", "//server/share/lib/svg.dll",
+                         "C:/msys64/ucrt64/lib/../svg.dll"):
+                with self.subTest(path=path), self.assertRaises(ValueError):
+                    package.relative_loader_cache(f'"{path}"\n', prefix, modules)
 
 
 if __name__ == "__main__":

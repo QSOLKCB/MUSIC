@@ -74,10 +74,20 @@ def relative_loader_cache(text, prefix, modules):
     for line in text.splitlines():
         if line.startswith('"') and line.lower().endswith('.dll"'):
             path = Path(line[1:-1].replace("\\\\", "/"))
-            try:
-                relative = path.relative_to(prefix).as_posix()
-            except ValueError as error:
-                raise ValueError(f"Loader outside UCRT64 prefix: {path}") from error
+            # Relocatable GdkPixbuf builds may already emit prefix-relative
+            # paths; older builds emit absolute paths. Both must identify an
+            # exact loader selected from this prefix, without parent traversal.
+            if ".." in path.parts:
+                raise ValueError(f"Loader outside UCRT64 prefix: {path}")
+            if path.is_absolute():
+                try:
+                    relative = path.relative_to(prefix).as_posix()
+                except ValueError as error:
+                    raise ValueError(f"Loader outside UCRT64 prefix: {path}") from error
+            else:
+                if path.drive or path.root or ":" in str(path):
+                    raise ValueError(f"Loader outside UCRT64 prefix: {path}")
+                relative = path.as_posix()
             if relative.lower() not in expected:
                 raise ValueError(f"Unexpected loader: {relative}")
             found.add(relative.lower())

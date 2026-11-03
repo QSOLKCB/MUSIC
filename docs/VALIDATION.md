@@ -46,7 +46,7 @@ ZIP from a Unicode/space path with no development PATH and checks loaded DLLs.
 The separate runtime diagnostic exercises schemas, symbolic icons and SVGs;
 the existing GUI smoke exercises null-device audio and project persistence.
 
-Locally, all four Release CTest targets pass, including 19 portable packaging
+Locally, all four Release CTest targets pass, including 22 portable packaging
 negative tests; the deterministic demo WAV digest remains unchanged. Native
 Windows build/package/smoke results must be read at the exact PR head. They have
 not been executed on this Linux workspace, which has no Windows desktop or GTK.
