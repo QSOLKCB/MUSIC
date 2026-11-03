@@ -31,8 +31,59 @@ The GUI test verifies that a Unicode track name, clip placement, trims and gain 
 ## Not yet verified
 
 - Physical microphone/speaker devices, latency, drift, dropouts and recording permission prompts.
-- Windows GTK compilation/packaging and a signed/notarized self-contained Mac application.
+- Physical Windows desktop acceptance and a signed/notarized self-contained Mac application.
 - Long recording stress tests, professional recording quality, and actual hardware resource measurements.
 - Adversarial concurrent replacement of local filesystem inputs or crash recovery.
 
 The null-device test never accesses a real microphone. A successful desktop build is not a physical-device acceptance test.
+
+## Windows desktop packaging milestone (3 November 2026)
+
+Added a native MSYS2 UCRT64 GTK build and unsigned portable ZIP, including
+recursive DLL closure, relocatable image loaders, schemas, icons, dependency
+notices and a file-hash/source manifest. The Windows CI job runs the extracted
+ZIP from a Unicode/space path with no development PATH and checks loaded DLLs.
+The separate runtime diagnostic exercises schemas, symbolic icons and SVGs;
+the existing GUI smoke exercises null-device audio and project persistence.
+
+Locally, all four Release CTest targets pass, including 30 portable packaging
+helper tests; the deterministic demo WAV digest remains unchanged. Native
+Windows build/package/smoke results must be read at the exact PR head. They have
+not been executed on this Linux workspace, which has no Windows desktop or GTK.
+No physical device, permission prompt, latency or dropout result is claimed.
+The [physical-device checklist](DEVICE-ACCEPTANCE.md) remains explicitly unexecuted.
+Historical validation and exact-span mixer evidence are preserved unchanged.
+
+The initial Windows workflow could not start because the repository permits only
+GitHub-owned or enterprise-owned Actions (runs `41558625804` and `41558635807`).
+The workflow now uses the Windows runner's preinstalled MSYS2 and normal package
+manager commands. The repository restriction is unchanged; the disallowed action
+is neither vendored nor executed indirectly. Those startup failures remain part
+of the validation history.
+
+The Windows job uploads only logs, source/file manifests, package inventories and
+archive hashes. Dependency-bearing ZIP/DLL upload is gated off until matching
+corresponding sources and redistribution review are complete. The locally built
+ZIP is still extracted and tested inside CI; no binary release is implied.
+
+At source tree `ccc9d938bcd03991d51d2977a3a3a5aaadd6d20c`, the Windows
+[push job passed](https://github.com/QSOLKCB/MUSIC/actions/runs/41563131694),
+including the extracted runtime and GUI smoke. The corresponding
+[PR job failed](https://github.com/QSOLKCB/MUSIC/actions/runs/41563136265)
+after schema/icon/SVG validation, during live module inspection with WinError 6.
+The old diagnostic did not identify the failing operation, so the exact cause
+is not established. Dependency package versions and bundled dependencies
+matched between those runs. A subsequent correction captured module names using
+a Toolhelp snapshot, with bounded retry for its documented changing-list error
+and explicit API names on failures. That approach failed the Unicode path test
+as described below. These historical results do not substitute for green checks
+on the corrected head.
+
+The subsequent [diagnostic run](https://github.com/QSOLKCB/MUSIC/actions/runs/41565245620)
+established that Toolhelp's wide-character snapshot names replaced the directory's
+Greek Ω with Latin O before path resolution; its structure layout was correct.
+The Unicode relocation test remains unchanged. The verifier now queries Unicode
+names with PSAPI, and retries an invalid module-handle query only if that module
+is demonstrably absent in a fresh validated enumeration. A retry discards the
+whole previous capture, is time-bounded, and requires the child to remain alive.
+Persistent errors, incomplete enumerations and containment failures still fail.

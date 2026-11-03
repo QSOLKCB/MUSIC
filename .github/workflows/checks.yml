@@ -51,3 +51,67 @@ jobs:
           path: artifacts/
           if-no-files-found: ignore
           retention-days: 14
+  windows-desktop:
+    runs-on: windows-2025
+    timeout-minutes: 30
+    env:
+      MSYSTEM: UCRT64
+      CHERE_INVOKING: '1'
+      MSYS2_PATH_TYPE: minimal
+    defaults:
+      run:
+        shell: C:\msys64\usr\bin\bash.exe -l -e -o pipefail {0}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check runner-provided MSYS2
+        shell: pwsh
+        run: |
+          if (!(Test-Path 'C:\msys64\usr\bin\bash.exe')) {
+            throw 'The Windows runner must provide MSYS2 at C:\msys64.'
+          }
+      # Use the runner's installed toolchain manager, not a third-party Action.
+      # Separate shells let an MSYS2 runtime upgrade finish before dependency setup.
+      - name: Update runner-provided MSYS2
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $false
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          $output = & 'C:\msys64\usr\bin\bash.exe' -lc 'pacman --noconfirm -Syu' 2>&1
+          $code = $LASTEXITCODE
+          $output | Tee-Object -FilePath artifacts/msys2-update.log | Write-Host
+          # A core-runtime upgrade deliberately closes its Bash process. Only
+          # this documented restart outcome is accepted; all other failures stop.
+          $restart = ($output -join "`n") -match 'To complete this update all MSYS2 processes including this terminal will be closed'
+          if ($code -ne 0 -and !($code -eq 1 -and $restart)) {
+            throw "MSYS2 update failed with exit code $code."
+          }
+          $global:LASTEXITCODE = 0
+      - name: Install native Windows GTK toolchain
+        run: |
+          pacman --noconfirm -Syu --needed git \
+            mingw-w64-ucrt-x86_64-gcc \
+            mingw-w64-ucrt-x86_64-cmake \
+            mingw-w64-ucrt-x86_64-ninja \
+            mingw-w64-ucrt-x86_64-pkgconf \
+            mingw-w64-ucrt-x86_64-python \
+            mingw-w64-ucrt-x86_64-gtk4 \
+            mingw-w64-ucrt-x86_64-adwaita-icon-theme \
+            mingw-w64-ucrt-x86_64-librsvg
+      - name: Build, package, and test relocated native Windows desktop
+        run: ./build-windows.sh
+      # Do not upload dependency-bearing binaries until matching corresponding
+      # sources and redistribution review are complete. Validation still uses the ZIP.
+      - name: Preserve Windows validation evidence (no binary redistribution)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: music-windows-x64-validation
+          path: |
+            dist/*.sha256
+            dist/MUSIC-windows-x64/manifest.json
+            dist/MUSIC-windows-x64/runtime-packages.txt
+            dist/MUSIC-windows-x64/build-packages.txt
+            artifacts/windows-package-smoke.log
+            artifacts/msys2-update.log
+          if-no-files-found: ignore
+          retention-days: 14

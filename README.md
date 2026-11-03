@@ -38,6 +38,15 @@ brew install cmake gtk4 pkgconf
 
 The build produces `build/music.app` with a microphone usage description. macOS may ask for recording permission when you press Record. This preview is a source build using installed GTK libraries; it is not a signed, notarized, self-contained Mac distribution.
 
+### Windows desktop
+
+Build in the MSYS2 **UCRT64** shell with `./build-windows.sh` after installing the
+[Windows build dependencies](docs/WINDOWS.md). It creates a portable unsigned ZIP
+with GTK, runtime DLLs, icons, schemas and dependency notices, then tests the
+extracted package without the development PATH. Extract the entire ZIP and open
+`MUSIC.cmd` or `bin/music.exe`. This preview does not install drivers or system
+packages, and physical audio acceptance remains separate.
+
 ### Windows core and CLI
 
 The C99 core and project-inspection CLI build with CMake and a C compiler:
@@ -48,13 +57,14 @@ cmake --build build --config Release
 ctest --test-dir build -C Release --output-on-failure
 ```
 
-The GTK source and audio adapter are intended for Windows too. A supported Windows GTK distribution and packaging path remain a follow-up; passing the Windows core tests is not a Windows desktop acceptance test.
+The MSVC core/CLI build is independent of the UCRT64 desktop build. Passing its
+tests alone is not a Windows desktop or physical-device acceptance test.
 
 ### Dependencies
 
 The core uses only the C standard library. The desktop adds system GTK 4.10+ and [miniaudio 0.11.26](https://github.com/mackron/miniaudio/tree/877ea4a7c2601c7b0f2a44e83dfac42e6470fea6) for local audio devices. The GUI build downloads that one pinned header and checks its SHA-256. It can instead be placed at `build/dependencies/miniaudio.h` before configuring for an offline build. Runtime needs no download, account, cloud inference, HTTP server, Node, or Docker.
 
-The app does not install system packages or drivers. Linux and macOS desktop builds, Linux native UI tests, and portable core tests on all three operating systems have passed in [CI](.github/workflows/checks.yml). See [validation status](docs/VALIDATION.md) for executed results and limits.
+The app does not install system packages or drivers. Linux and macOS desktop builds, Linux native UI tests, and portable core tests on all three operating systems have passed in [CI](.github/workflows/checks.yml). A separate Windows desktop job builds and checks the relocated ZIP. See [validation status](docs/VALIDATION.md) for executed results and limits.
 
 ## Preview scope
 

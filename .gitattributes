@@ -1,0 +1,3 @@
+# Keep the same normalized sources in Git for Windows and MSYS2 Git checkouts.
+* text=auto eol=lf
+*.cmd text eol=crlf
