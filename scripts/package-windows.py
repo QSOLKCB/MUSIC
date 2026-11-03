@@ -107,7 +107,7 @@ def build_package(build, prefix, destination, source):
     if dirty:
         raise ValueError("Package only a clean checkout so HEAD identifies the actual source:\n" + dirty)
     source_commit = run("git", "-C", source, "rev-parse", "HEAD").strip()
-    source_tree = run("git", "-C", source, "rev-parse", "HEAD^{tree}").strip()
+    source_tree = run("git", "-C", source, "show", "-s", "--format=%T", "HEAD").strip()
     objdump = prefix / "bin/objdump.exe"
     system = dll_index(Path(os.environ["SystemRoot"]) / "System32")
     bin_dir = destination / "bin"
