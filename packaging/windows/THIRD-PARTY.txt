@@ -1,0 +1,24 @@
+MUSIC portable Windows preview
+
+MUSIC is Apache-2.0 licensed; see LICENSE. miniaudio has its own license in
+MINIAUDIO-LICENSE.txt. GTK and the other dynamically linked libraries retain
+their separate licenses, including LGPL terms. See share/licenses for the
+dependency notices and license texts installed by MSYS2.
+Some included notices also cover build-only packages.
+
+runtime-packages.txt records the installed versions, upstream URLs and license
+identifiers for packages owning bundled DLLs. manifest.json maps those DLLs to
+packages and records the hashes of every packaged file. build-packages.txt
+records the complete toolchain/package inventory, not just runtime libraries.
+
+MSYS2 package recipes, patches and source information are available at:
+https://github.com/msys2/MINGW-packages
+https://packages.msys2.org/
+https://repo.msys2.org/mingw/sources/
+
+This is an unsigned engineering preview, not a signed installer. Before a
+public binary release, retain and provide the corresponding source archives
+and build recipes for the exact dependency versions being redistributed, and
+review all applicable license obligations. Do not remove the dependency
+notices when redistributing this preview. Dynamic libraries remain replaceable;
+MUSIC does not prevent users from substituting compatible library builds.

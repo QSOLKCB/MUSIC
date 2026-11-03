@@ -36,7 +36,7 @@ Mixing uses signed 64-bit accumulation and fixed-point track gain, then signed d
 
 ## Next implementation order
 
-1. Physical-device acceptance on Linux and Mac; Windows native desktop build and packaging.
+1. Physical-device acceptance on Linux and Mac using [the acceptance checklist](DEVICE-ACCEPTANCE.md); the [Windows UCRT64 desktop build and portable ZIP](WINDOWS.md) now have implementation and CI coverage. Physical acceptance remains open on every platform.
 2. Undo/redo, multiple clips per track, split/duplicate, zoom/scroll, device selection and latency calibration.
 3. Higher-resolution audio path and evaluated resampling, with explicit format migration.
 4. MIDI events, piano roll and a local instrument engine.

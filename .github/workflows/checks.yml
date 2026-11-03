@@ -51,3 +51,40 @@ jobs:
           path: artifacts/
           if-no-files-found: ignore
           retention-days: 14
+  windows-desktop:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install native Windows GTK toolchain
+        uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2
+        with:
+          msystem: UCRT64
+          update: true
+          path-type: strict
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-gtk4
+            mingw-w64-ucrt-x86_64-adwaita-icon-theme
+            mingw-w64-ucrt-x86_64-librsvg
+      - name: Build, package, and test relocated native Windows desktop
+        run: ./build-windows.sh
+      - name: Preserve Windows package and validation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: music-windows-x64-preview
+          path: |
+            dist/*.zip
+            dist/*.sha256
+            artifacts/windows-package-smoke.log
+          if-no-files-found: ignore
+          retention-days: 14

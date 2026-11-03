@@ -1,0 +1,157 @@
+#!/usr/bin/env python3
+"""Verify and smoke-test the extracted ZIP outside the development environment."""
+import argparse
+import ctypes
+from ctypes import wintypes
+import hashlib
+import json
+import os
+from pathlib import Path, PurePosixPath
+import subprocess
+import sys
+import tempfile
+import time
+import zipfile
+
+
+def verify_tree(root):
+    manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+    if manifest["format"] != 1 or not manifest["runtime_owners"]:
+        raise ValueError("Missing runtime inventory")
+    actual = {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
+    if actual != set(manifest["files"]) | {"manifest.json"}:
+        raise ValueError("Package file inventory mismatch")
+    for name, digest in manifest["files"].items():
+        if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
+            raise ValueError(f"Package hash mismatch: {name}")
+    for name in ("bin/music.exe", "bin/music-cli.exe", "bin/music-runtime-check.exe", "MUSIC.cmd",
+                 "LICENSE", "MINIAUDIO-LICENSE.txt", "THIRD-PARTY.txt", "runtime-packages.txt",
+                 "share/glib-2.0/schemas/gschemas.compiled", "share/icons/Adwaita/index.theme",
+                 "share/icons/hicolor/index.theme"):
+        if not (root / name).is_file():
+            raise ValueError(f"Required package file missing: {name}")
+    if not list((root / "share/licenses").rglob("*")):
+        raise ValueError("No dependency licenses")
+    caches = list((root / "lib/gdk-pixbuf-2.0").glob("*/loaders.cache"))
+    if len(caches) != 1:
+        raise ValueError("Expected one pixbuf loader cache")
+    for line in caches[0].read_text(encoding="utf-8").splitlines():
+        if line.startswith('"') and line.lower().endswith('.dll"'):
+            name = json.loads(line)
+            relative = PurePosixPath(name)
+            if relative.is_absolute() or ".." in relative.parts or ":" in name or "\\" in name:
+                raise ValueError("Non-relocatable pixbuf loader cache")
+            if not (root / name).is_file():
+                raise ValueError(f"Missing pixbuf loader: {name}")
+    return manifest
+
+
+def loaded_modules(pid):
+    """Read this test child's DLL paths, not an unrelated process."""
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    psapi = ctypes.WinDLL("psapi", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    psapi.EnumProcessModulesEx.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.HMODULE), wintypes.DWORD,
+                                        ctypes.POINTER(wintypes.DWORD), wintypes.DWORD]
+    psapi.GetModuleFileNameExW.argtypes = [wintypes.HANDLE, wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
+    handle = kernel.OpenProcess(0x0400 | 0x0010, False, pid)
+    if not handle:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        modules = (wintypes.HMODULE * 2048)()
+        needed = wintypes.DWORD()
+        if not psapi.EnumProcessModulesEx(handle, modules, ctypes.sizeof(modules), ctypes.byref(needed), 3):
+            raise ctypes.WinError(ctypes.get_last_error())
+        if needed.value > ctypes.sizeof(modules):
+            raise ValueError("Loaded-module buffer too small")
+        paths = []
+        for module in modules[:needed.value // ctypes.sizeof(wintypes.HMODULE)]:
+            path = ctypes.create_unicode_buffer(32768)
+            length = psapi.GetModuleFileNameExW(handle, module, path, len(path))
+            if not length or length >= len(path):
+                raise ctypes.WinError(ctypes.get_last_error())
+            paths.append(Path(path.value).resolve())
+        return paths
+    finally:
+        kernel.CloseHandle(handle)
+
+
+def isolated_environment():
+    # Inherit only ordinary Windows account/temporary-directory state. In
+    # particular, no MSYS PATH, GTK/GIO/GDK paths, XDG overrides or preload hooks.
+    keep = {"systemroot", "windir", "comspec", "temp", "tmp", "userprofile", "appdata", "localappdata",
+            "homedrive", "homepath", "username", "userdomain", "programdata"}
+    env = {key: value for key, value in os.environ.items() if key.lower() in keep}
+    windows = Path(os.environ["SystemRoot"])
+    env["PATH"] = os.pathsep.join((str(windows / "System32"), str(windows)))
+    env.update(GTK_A11Y="none", GSK_RENDERER="cairo")
+    return env
+
+
+def check_archive(archive, log):
+    if os.name != "nt":
+        raise ValueError("Native package execution requires Windows")
+    log.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="MUSIC relocated Ω space ") as temporary:
+        base = Path(temporary)
+        with zipfile.ZipFile(archive) as source:
+            for name in source.namelist():
+                path = PurePosixPath(name)
+                if path.is_absolute() or ".." in path.parts or ":" in name or "\\" in name:
+                    raise ValueError(f"Unsafe archive member: {name}")
+            source.extractall(base)
+        roots = [path for path in base.iterdir() if path.is_dir()]
+        if len(roots) != 1:
+            raise ValueError("Expected one package root")
+        root = roots[0]
+        manifest = verify_tree(root)
+        cwd = base / "unrelated working directory"
+        cwd.mkdir()
+        env = isolated_environment()
+        svg = next((root / "share/icons/Adwaita").rglob("document-open-symbolic.svg"), None)
+        if svg is None:
+            raise ValueError("No symbolic SVG fixture in Adwaita")
+        env["MUSIC_PACKAGE_SVG"] = str(svg)
+        output = [f"Source commit: {manifest['source_commit']}", f"Source tree: {manifest['source_tree']}"]
+        for executable, arguments in (("music.exe", ["--version"]), ("music-cli.exe", ["--version"]),
+                                      ("music-runtime-check.exe", [])):
+            result = subprocess.run([str(root / "bin" / executable), *arguments], cwd=cwd, env=env,
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                    encoding="utf-8", errors="replace", timeout=30, check=True)
+            output.append(result.stdout)
+        with subprocess.Popen([str(root / "bin/music.exe"), "--smoke"], cwd=cwd, env=env,
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                              encoding="utf-8", errors="replace") as process:
+            try:
+                time.sleep(1.5)
+                paths = loaded_modules(process.pid)
+                windows = Path(os.environ["SystemRoot"]).resolve()
+                for path in paths:
+                    if not path.is_relative_to(root) and not path.is_relative_to(windows):
+                        raise ValueError(f"Loaded DLL outside package/Windows: {path}")
+                output.append("Loaded modules:\n" + "\n".join(str(path) for path in paths))
+                stdout, _ = process.communicate(timeout=60)
+                output.append(stdout)
+                log.write_text("\n".join(output), encoding="utf-8")
+                if process.returncode or "GTK/audio smoke: PASS" not in stdout:
+                    raise ValueError(f"Packaged GUI smoke failed ({process.returncode}); see {log}")
+                if any(word in stdout for word in ("CRITICAL", "ERROR", "FAIL")):
+                    raise ValueError(f"Packaged GUI logged an error; see {log}")
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.communicate()
+        print("Extracted Windows package: PASS (relocated Unicode/space path, isolated PATH, native GTK, null audio)")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("archive", type=Path)
+    parser.add_argument("--log", type=Path, default=Path("artifacts/windows-package-smoke.log"))
+    args = parser.parse_args()
+    try:
+        check_archive(args.archive.resolve(), args.log.resolve())
+    except (ValueError, OSError, subprocess.SubprocessError) as error:
+        sys.exit(f"Package verification failed: {error}")

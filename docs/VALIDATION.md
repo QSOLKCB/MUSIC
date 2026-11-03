@@ -31,8 +31,25 @@ The GUI test verifies that a Unicode track name, clip placement, trims and gain 
 ## Not yet verified
 
 - Physical microphone/speaker devices, latency, drift, dropouts and recording permission prompts.
-- Windows GTK compilation/packaging and a signed/notarized self-contained Mac application.
+- Physical Windows desktop acceptance and a signed/notarized self-contained Mac application.
 - Long recording stress tests, professional recording quality, and actual hardware resource measurements.
 - Adversarial concurrent replacement of local filesystem inputs or crash recovery.
 
 The null-device test never accesses a real microphone. A successful desktop build is not a physical-device acceptance test.
+
+## Windows desktop packaging milestone (3 November 2026)
+
+Added a native MSYS2 UCRT64 GTK build and unsigned portable ZIP, including
+recursive DLL closure, relocatable image loaders, schemas, icons, dependency
+notices and a file-hash/source manifest. The Windows CI job runs the extracted
+ZIP from a Unicode/space path with no development PATH and checks loaded DLLs.
+The separate runtime diagnostic exercises schemas, symbolic icons and SVGs;
+the existing GUI smoke exercises null-device audio and project persistence.
+
+Locally, all four Release CTest targets pass, including 12 portable packaging
+negative tests; the deterministic demo WAV digest remains unchanged. Native
+Windows build/package/smoke results must be read at the exact PR head. They have
+not been executed on this Linux workspace, which has no Windows desktop or GTK.
+No physical device, permission prompt, latency or dropout result is claimed.
+The [physical-device checklist](DEVICE-ACCEPTANCE.md) remains explicitly unexecuted.
+Historical validation and exact-span mixer evidence are preserved unchanged.
