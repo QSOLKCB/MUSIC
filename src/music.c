@@ -121,21 +121,42 @@ int music_import_wav(MusicProject *p,const char *name,const unsigned char *data,
 }
 
 void music_render(const MusicProject *p,uint32_t start,uint32_t frames,int16_t *out) {
-    uint32_t f; unsigned i,any_solo=0;
-    for (i=0;i<p->count;++i) if(p->tracks[i].solo) any_solo=1;
-    for(f=0;f<frames;++f) {
-        int64_t left=0,right=0; uint64_t position=(uint64_t)start+f;
+    /* OPT-DSP-001: resolve static controls and clip boundaries per exact span,
+       not per sample. No control decimation, allocation, or reordered sums. */
+    struct { const int16_t *samples; uint32_t gain; } active[MUSIC_TRACKS];
+    uint64_t position=start, end=(uint64_t)start+frames;
+    unsigned i,any_solo=0;
+    for(i=0;i<p->count;++i) if(p->tracks[i].solo) any_solo=1;
+    while(position<end) {
+        uint64_t next=end;
+        unsigned count=0;
         for(i=0;i<p->count;++i) {
-            const MusicTrackData *t=&p->tracks[i]; uint64_t index;
-            if(t->mute || (any_solo && !t->solo) || position<t->offset) continue;
-            index=position-t->offset+t->trim_in;
-            if(index>=t->trim_out) continue;
-            left+=(int64_t)t->samples[index*2]*t->gain;
-            right+=(int64_t)t->samples[index*2+1]*t->gain;
+            const MusicTrackData *t=&p->tracks[i];
+            uint64_t stop=(uint64_t)t->offset+t->trim_out-t->trim_in;
+            if(t->mute || (any_solo && !t->solo) || position>=stop) continue;
+            if(position<t->offset) {
+                if(t->offset<next) next=t->offset;
+            } else {
+                if(stop<next) next=stop;
+                active[count].samples=t->samples+((position-t->offset+t->trim_in)*2);
+                active[count++].gain=t->gain;
+            }
         }
-        left/=MUSIC_UNITY; right/=MUSIC_UNITY;
-        out[(size_t)f*2]=(int16_t)(left>32767?32767:left< -32768? -32768:left);
-        out[(size_t)f*2+1]=(int16_t)(right>32767?32767:right< -32768? -32768:right);
+        if(!count) {
+            size_t samples=(size_t)(next-position)*2;
+            memset(out,0,samples*sizeof(*out)); out+=samples; position=next;
+        }
+        for(;position<next;++position) {
+            int64_t left=0,right=0;
+            for(i=0;i<count;++i) {
+                left+=(int64_t)active[i].samples[0]*active[i].gain;
+                right+=(int64_t)active[i].samples[1]*active[i].gain;
+                active[i].samples+=2;
+            }
+            left/=MUSIC_UNITY; right/=MUSIC_UNITY;
+            *out++=(int16_t)(left>32767?32767:left< -32768? -32768:left);
+            *out++=(int16_t)(right>32767?32767:right< -32768? -32768:right);
+        }
     }
 }
 static int write_pcm(MusicWrite write,void *ctx,const int16_t *samples,uint32_t frames) {
