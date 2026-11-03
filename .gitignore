@@ -1,0 +1,5 @@
+/build*/
+/dist/
+/artifacts/
+*.partial
+__pycache__/
