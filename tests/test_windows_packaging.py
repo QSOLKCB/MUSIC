@@ -196,6 +196,44 @@ class PackagingTests(unittest.TestCase):
                 with self.subTest(path=path), self.assertRaises(ValueError):
                     package.relative_loader_cache(f'"{path}"\n', prefix, modules)
 
+    @staticmethod
+    def snapshot_error(code, operation="CreateToolhelp32Snapshot"):
+        error = OSError("snapshot test error")
+        error.winerror, error.operation = code, operation
+        return error
+
+    def test_snapshot_retries_only_documented_capture_race(self):
+        process = MagicMock()
+        process.poll.return_value = None
+        output = []
+        paths = [Path("/package/bin/music.exe"), Path("/package/bin/libgtk-4-1.dll")]
+        with patch.object(check, "loaded_modules", side_effect=[self.snapshot_error(24), paths]) as read, \
+             patch.object(check.time, "sleep"), patch.object(check.time, "monotonic", return_value=0):
+            self.assertEqual(check.snapshot_modules(process, output), paths)
+            self.assertEqual(read.call_count, 2)
+        self.assertIn("retrying complete snapshot", output[0])
+
+    def test_snapshot_other_errors_and_exhausted_window_fail(self):
+        process = MagicMock()
+        process.poll.return_value = None
+        for code, operation in ((6, "CreateToolhelp32Snapshot"), (5, "CreateToolhelp32Snapshot"), (24, "Module32NextW")):
+            with self.subTest(code=code, operation=operation), \
+                 patch.object(check, "loaded_modules", side_effect=self.snapshot_error(code, operation)) as read, \
+                 self.assertRaises(OSError):
+                check.snapshot_modules(process, [])
+            self.assertEqual(read.call_count, 1)
+        with patch.object(check, "loaded_modules", side_effect=self.snapshot_error(24)) as read, \
+             patch.object(check.time, "monotonic", side_effect=[0, 2]), self.assertRaises(OSError):
+            check.snapshot_modules(process, [])
+        self.assertEqual(read.call_count, 1)
+
+    def test_snapshot_cannot_pass_after_child_exits(self):
+        process = MagicMock()
+        process.poll.return_value = 0
+        with patch.object(check, "loaded_modules") as read, self.assertRaisesRegex(ValueError, "exited"):
+            check.snapshot_modules(process, [])
+        read.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

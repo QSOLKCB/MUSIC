@@ -46,8 +46,8 @@ ZIP from a Unicode/space path with no development PATH and checks loaded DLLs.
 The separate runtime diagnostic exercises schemas, symbolic icons and SVGs;
 the existing GUI smoke exercises null-device audio and project persistence.
 
-Locally, all four Release CTest targets pass, including 22 portable packaging
-negative tests; the deterministic demo WAV digest remains unchanged. Native
+Locally, all four Release CTest targets pass, including 25 portable packaging
+helper tests; the deterministic demo WAV digest remains unchanged. Native
 Windows build/package/smoke results must be read at the exact PR head. They have
 not been executed on this Linux workspace, which has no Windows desktop or GTK.
 No physical device, permission prompt, latency or dropout result is claimed.
@@ -65,3 +65,16 @@ The Windows job uploads only logs, source/file manifests, package inventories an
 archive hashes. Dependency-bearing ZIP/DLL upload is gated off until matching
 corresponding sources and redistribution review are complete. The locally built
 ZIP is still extracted and tested inside CI; no binary release is implied.
+
+At source tree `ccc9d938bcd03991d51d2977a3a3a5aaadd6d20c`, the Windows
+[push job passed](https://github.com/QSOLKCB/MUSIC/actions/runs/41563131694),
+including the extracted runtime and GUI smoke. The corresponding
+[PR job failed](https://github.com/QSOLKCB/MUSIC/actions/runs/41563136265)
+after schema/icon/SVG validation, during live module inspection with WinError 6.
+The old diagnostic did not identify the failing operation, so the exact cause
+is not established. Dependency package versions and bundled dependencies
+matched between those runs. The verifier now captures module names using a
+Toolhelp snapshot instead of querying each module's live handle, with bounded
+retry only for the documented snapshot-changing error and explicit API names on
+failures. Invalid-handle errors still fail; no module is skipped. These historical
+results do not substitute for green checks on the corrected head.

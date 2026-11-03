@@ -70,38 +70,70 @@ def verify_tree(root):
     return manifest
 
 
+def windows_error(operation):
+    error = ctypes.WinError(ctypes.get_last_error())
+    error.operation = operation
+    error.strerror = f"{operation}: {error.strerror}"
+    return error
+
+
 def loaded_modules(pid):
-    """Read this test child's DLL paths, not an unrelated process."""
+    """Capture names in one Toolhelp snapshot, not live per-module PSAPI reads."""
+    class ModuleEntry(ctypes.Structure):
+        _fields_ = [("dwSize", wintypes.DWORD), ("th32ModuleID", wintypes.DWORD),
+                    ("th32ProcessID", wintypes.DWORD), ("GlblcntUsage", wintypes.DWORD),
+                    ("ProccntUsage", wintypes.DWORD), ("modBaseAddr", ctypes.POINTER(ctypes.c_byte)),
+                    ("modBaseSize", wintypes.DWORD), ("hModule", wintypes.HMODULE),
+                    ("szModule", wintypes.WCHAR * 256), ("szExePath", wintypes.WCHAR * 260)]
+
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    psapi = ctypes.WinDLL("psapi", use_last_error=True)
-    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
-    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel.Module32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ModuleEntry)]
+    kernel.Module32FirstW.restype = wintypes.BOOL
+    kernel.Module32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ModuleEntry)]
+    kernel.Module32NextW.restype = wintypes.BOOL
     kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-    psapi.EnumProcessModulesEx.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.HMODULE), wintypes.DWORD,
-                                        ctypes.POINTER(wintypes.DWORD), wintypes.DWORD]
-    psapi.GetModuleFileNameExW.argtypes = [wintypes.HANDLE, wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
-    handle = kernel.OpenProcess(0x0400 | 0x0010, False, pid)
-    if not handle:
-        raise ctypes.WinError(ctypes.get_last_error())
+    kernel.CloseHandle.restype = wintypes.BOOL
+    handle = kernel.CreateToolhelp32Snapshot(0x00000008 | 0x00000010, pid)
+    if handle == ctypes.c_void_p(-1).value:
+        raise windows_error("CreateToolhelp32Snapshot")
     try:
-        modules = (wintypes.HMODULE * 2048)()
-        needed = wintypes.DWORD()
-        if not psapi.EnumProcessModulesEx(handle, modules, ctypes.sizeof(modules), ctypes.byref(needed), 3):
-            raise ctypes.WinError(ctypes.get_last_error())
-        if not needed.value or needed.value % ctypes.sizeof(wintypes.HMODULE):
-            raise ValueError("Invalid loaded-module count")
-        if needed.value > ctypes.sizeof(modules):
-            raise ValueError("Loaded-module buffer too small")
+        entry = ModuleEntry()
+        entry.dwSize = ctypes.sizeof(entry)
+        if not kernel.Module32FirstW(handle, ctypes.byref(entry)):
+            raise windows_error("Module32FirstW")
         paths = []
-        for module in modules[:needed.value // ctypes.sizeof(wintypes.HMODULE)]:
-            path = ctypes.create_unicode_buffer(32768)
-            length = psapi.GetModuleFileNameExW(handle, module, path, len(path))
-            if not length or length >= len(path):
-                raise ctypes.WinError(ctypes.get_last_error())
-            paths.append(Path(path.value).resolve())
-        return paths
+        while True:
+            name = entry.szExePath
+            if not name or len(name) >= 259:
+                raise ValueError("Empty or potentially truncated module snapshot path")
+            paths.append(Path(name).resolve())
+            if not kernel.Module32NextW(handle, ctypes.byref(entry)):
+                if ctypes.get_last_error() != 18:  # ERROR_NO_MORE_FILES
+                    raise windows_error("Module32NextW")
+                return paths
     finally:
         kernel.CloseHandle(handle)
+
+
+def snapshot_modules(process, output):
+    # Microsoft documents ERROR_BAD_LENGTH for a module list changing during
+    # snapshot creation. Retry the whole snapshot for at most one second while
+    # the child is alive; never omit modules or accept an incomplete observation.
+    deadline = time.monotonic() + 1.0
+    while True:
+        if process.poll() is not None:
+            raise ValueError("GUI exited before its module snapshot")
+        try:
+            return loaded_modules(process.pid)
+        except OSError as error:
+            retryable = (getattr(error, "winerror", None) == 24 and
+                         getattr(error, "operation", None) == "CreateToolhelp32Snapshot")
+            if not retryable or process.poll() is not None or time.monotonic() >= deadline:
+                raise
+            output.append("Module snapshot changed during capture (ERROR_BAD_LENGTH); retrying complete snapshot")
+            time.sleep(0.05)
 
 
 def verify_module_paths(paths, root, windows):
@@ -163,7 +195,7 @@ def smoke(root, cwd, env, output):
         captured = False
         try:
             time.sleep(1.5)
-            paths = loaded_modules(process.pid)
+            paths = snapshot_modules(process, output)
             windows = Path(os.environ["SystemRoot"]).resolve()
             verify_module_paths(paths, root, windows)
             output.append("Loaded modules:\n" + "\n".join(str(path) for path in paths))
